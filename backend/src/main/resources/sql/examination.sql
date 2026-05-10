@@ -32,32 +32,13 @@ CREATE TABLE IF NOT EXISTS `examination_package` (
   UNIQUE KEY `uk_package_code` (`package_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='体检套餐表';
 
--- 体检计划表（关联医院和体检套餐）
-CREATE TABLE IF NOT EXISTS `examination_plan` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `hospital_id` BIGINT NOT NULL COMMENT '医院ID',
-  `package_id` BIGINT NOT NULL COMMENT '套餐ID',
-  `plan_name` VARCHAR(128) COMMENT '计划名称',
-  `schedule_date` DATE NOT NULL COMMENT '排期日期',
-  `schedule_time` VARCHAR(32) COMMENT '时间段',
-  `total_slots` INT DEFAULT 0 COMMENT '总名额',
-  `available_slots` INT DEFAULT 0 COMMENT '剩余名额',
-  `price` DECIMAL(10, 2) COMMENT '价格',
-  `status` TINYINT DEFAULT 1 COMMENT '状态(0-停用 1-可预约 2-已满)',
-  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` TINYINT DEFAULT 0 COMMENT '逻辑删除标记',
-  PRIMARY KEY (`id`),
-  KEY `idx_hospital_id` (`hospital_id`),
-  KEY `idx_package_id` (`package_id`),
-  KEY `idx_schedule_date` (`schedule_date`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='体检计划表';
-
 -- 体检预约表
 CREATE TABLE IF NOT EXISTS `examination_booking` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `booking_no` VARCHAR(64) NOT NULL COMMENT '预约编号',
-  `plan_id` BIGINT NOT NULL COMMENT '体检计划ID',
+  `hospital_id` BIGINT NOT NULL COMMENT '医院ID',
+  `package_id` BIGINT NOT NULL COMMENT '套餐ID',
+  `schedule_date` DATE NOT NULL COMMENT '预约日期',
   `user_id` VARCHAR(64) NOT NULL COMMENT '用户ID',
   `booker_name` VARCHAR(128) NOT NULL COMMENT '登记人姓名',
   `booker_phone` VARCHAR(32) NOT NULL COMMENT '登记人电话',
@@ -70,7 +51,9 @@ CREATE TABLE IF NOT EXISTS `examination_booking` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_booking_no` (`booking_no`),
   KEY `idx_user_id` (`user_id`),
-  KEY `idx_plan_id` (`plan_id`)
+  KEY `idx_hospital_id` (`hospital_id`),
+  KEY `idx_package_id` (`package_id`),
+  KEY `idx_schedule_date` (`schedule_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='体检预约表';
 
 -- 初始化医院数据
@@ -91,15 +74,3 @@ INSERT INTO `examination_package` (`package_code`, `package_name`, `package_desc
 ('PKG_EMPLOYMENT', '入职体检套餐', '身高、体重、视力、听力、血常规、肝功能、胸片、心电图', 199.00, '45', 1),
 ('PKG_SENIOR', '老年体检套餐', '全身体检项目+骨密度、颈动脉彩超、眼底检查、前列腺/乳腺彩超', 1299.00, '150', 1),
 ('PKG_WOMAN', '女性专项体检套餐', '基础体检+妇科检查、乳腺彩超、宫颈TCT、HPV检查', 799.00, '90', 1);
-
--- 初始化体检计划数据（关联医院和套餐）
-INSERT INTO `examination_plan` (`hospital_id`, `package_id`, `plan_name`, `schedule_date`, `schedule_time`, `total_slots`, `available_slots`, `price`, `status`) VALUES
-(1, 2, '北京协和医院-全身体检', '2026-05-15', '上午 8:00-12:00', 10, 8, 899.00, 1),
-(1, 3, '北京协和医院-入职体检', '2026-05-15', '下午 14:00-17:00', 15, 15, 199.00, 1),
-(2, 2, '301医院-全身体检', '2026-05-16', '上午 8:00-12:00', 10, 10, 899.00, 1),
-(3, 4, '北京大学第一医院-老年体检', '2026-05-18', '上午 8:00-12:00', 8, 6, 1299.00, 1),
-(4, 1, '中山医院-基础体检', '2026-05-20', '上午 8:00-12:00', 20, 20, 299.00, 1),
-(5, 5, '瑞金医院-女性专项体检', '2026-05-22', '上午 8:00-12:00', 12, 12, 799.00, 1),
-(6, 2, '广东省人民医院-全身体检', '2026-05-25', '上午 8:00-12:00', 10, 10, 899.00, 1),
-(7, 1, '华西医院-基础体检', '2026-05-28', '上午 8:00-12:00', 20, 20, 299.00, 1),
-(8, 3, '武汉同济医院-入职体检', '2026-05-30', '下午 14:00-17:00', 15, 15, 199.00, 1);

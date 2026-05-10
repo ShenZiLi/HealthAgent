@@ -3,6 +3,7 @@ package com.healthagent.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -15,8 +16,14 @@ public class ExaminationBookingEntity {
     @TableField("booking_no")
     private String bookingNo;
 
-    @TableField("plan_id")
-    private Long planId;
+    @TableField("hospital_id")
+    private Long hospitalId;
+
+    @TableField("package_id")
+    private Long packageId;
+
+    @TableField("schedule_date")
+    private LocalDate scheduleDate;
 
     @TableField("user_id")
     private String userId;

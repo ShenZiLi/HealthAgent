@@ -10,12 +10,11 @@ import java.time.LocalDateTime;
 public class ExaminationBookingDTO {
     private Long id;
     private String bookingNo;
-    private Long planId;
-    private String planName;
+    private Long hospitalId;
+    private Long packageId;
     private String hospitalName;
     private String packageName;
     private LocalDate scheduleDate;
-    private String scheduleTime;
     private BigDecimal price;
     private String userId;
     private String bookerName;

@@ -1,13 +1,13 @@
 package com.healthagent.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+
+import java.time.LocalDate;
 
 @Data
 public class ExaminationBookingRequestDTO {
 
-    @NotNull(message = "体检计划ID不能为空")
     private Long planId;
 
     @NotBlank(message = "用户ID不能为空")
@@ -22,4 +22,10 @@ public class ExaminationBookingRequestDTO {
     private String idCardNo;
 
     private String notes;
+
+    private LocalDate scheduleDate;
+
+    private Long hospitalId;
+
+    private Long packageId;
 }

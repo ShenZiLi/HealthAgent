@@ -18,30 +18,14 @@ export interface ExaminationPackage {
   duration: string;
 }
 
-export interface ExaminationPlan {
-  id: number;
-  hospitalId: number;
-  packageId: number;
-  planName: string;
-  hospitalName: string;
-  packageName: string;
-  scheduleDate: string;
-  scheduleTime: string;
-  totalSlots: number;
-  availableSlots: number;
-  price: number;
-  status: number;
-}
-
 export interface ExaminationBooking {
   id: number;
   bookingNo: string;
-  planId: number;
-  planName: string;
+  hospitalId: number;
+  packageId: number;
   hospitalName: string;
   packageName: string;
   scheduleDate: string;
-  scheduleTime: string;
   price: number;
   userId: string;
   bookerName: string;
@@ -53,10 +37,12 @@ export interface ExaminationBooking {
 }
 
 export interface BookingRequest {
-  planId: number;
   userId: string;
   bookerName: string;
   bookerPhone: string;
   idCardNo: string;
   notes: string;
+  hospitalId?: number;
+  packageId?: number;
+  scheduleDate?: string;
 }

@@ -50,7 +50,6 @@
             <label class="block text-sm text-slate-600 mb-1">选择医院</label>
             <select
               v-model="selectedHospitalCode"
-              @change="onHospitalChange"
               class="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             >
               <option value="">请选择医院</option>
@@ -63,40 +62,14 @@
           <!-- 选择日期 -->
           <div class="mb-4">
             <label class="block text-sm text-slate-600 mb-1">预约日期</label>
-            <select
+            <input
+              type="date"
               v-model="selectedDate"
-              @change="onDateChange"
+              :min="minDate"
+              :max="maxDate"
               :disabled="!selectedHospitalCode"
               class="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-slate-50 disabled:text-slate-400"
-            >
-              <option value="">请选择日期</option>
-              <option v-for="d in availableDates" :key="d" :value="d">
-                {{ formatDateCN(d) }}
-              </option>
-            </select>
-          </div>
-
-          <!-- 选择时间 -->
-          <div class="mb-4">
-            <label class="block text-sm text-slate-600 mb-1">预约时间</label>
-            <select
-              v-model="selectedTime"
-              :disabled="!selectedDate"
-              class="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-slate-50 disabled:text-slate-400"
-            >
-              <option value="">请选择时间</option>
-              <option v-for="t in availableTimes" :key="t" :value="t">
-                {{ t }}
-              </option>
-            </select>
-          </div>
-
-          <!-- 剩余名额 -->
-          <div v-if="selectedPlan" class="mb-4 p-3 bg-blue-50 rounded-lg">
-            <div class="flex justify-between text-sm">
-              <span class="text-slate-600">剩余名额</span>
-              <span class="text-blue-600 font-semibold">{{ selectedPlan.availableSlots }} / {{ selectedPlan.totalSlots }}</span>
-            </div>
+            />
           </div>
 
           <!-- 预约人信息 -->
@@ -169,7 +142,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { examinationApi } from '@/utils/examinationApi';
-import type { ExaminationPackage, ExaminationHospital, ExaminationPlan, ExaminationBooking } from '@/types/examination';
+import type { ExaminationPackage, ExaminationHospital, ExaminationBooking } from '@/types/examination';
 import { ArrowLeft, Loader2, CheckCircle } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -182,35 +155,28 @@ const bookingResult = ref<ExaminationBooking | null>(null);
 
 const currentPackage = ref<ExaminationPackage | null>(null);
 const hospitals = ref<ExaminationHospital[]>([]);
-const plans = ref<ExaminationPlan[]>([]);
 
 const selectedHospitalCode = ref('');
 const selectedDate = ref('');
-const selectedTime = ref('');
 const bookerName = ref(user.value?.realName || '');
 const bookerPhone = ref('');
 const idCardNo = ref(user.value?.idCardNo || '');
 
-const availableDates = computed(() => {
-  return [...new Set(plans.value.map(p => p.scheduleDate))].sort();
+const minDate = computed(() => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().split('T')[0];
 });
 
-const availableTimes = computed(() => {
-  return plans.value
-    .filter(p => p.scheduleDate === selectedDate.value && p.availableSlots > 0)
-    .map(p => p.scheduleTime);
-});
-
-const selectedPlan = computed(() => {
-  return plans.value.find(p =>
-    p.scheduleDate === selectedDate.value &&
-    p.scheduleTime === selectedTime.value &&
-    p.availableSlots > 0
-  );
+const maxDate = computed(() => {
+  const threeMonths = new Date();
+  threeMonths.setMonth(threeMonths.getMonth() + 3);
+  return threeMonths.toISOString().split('T')[0];
 });
 
 const canBook = computed(() => {
-  return selectedPlan.value &&
+  return selectedHospitalCode.value &&
+    selectedDate.value &&
     bookerName.value &&
     bookerPhone.value;
 });
@@ -228,12 +194,6 @@ function getPackageItems(pkg: ExaminationPackage | null): string {
   return packageItemsMap[pkg.packageName] || pkg.packageDesc || '-';
 }
 
-function formatDateCN(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00');
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-  return `${date.getMonth() + 1}月${date.getDate()}日 周${weekdays[date.getDay()]}`;
-}
-
 async function loadHospitals() {
   const result = await examinationApi.getHospitals();
   if (result.code === 200) {
@@ -241,44 +201,20 @@ async function loadHospitals() {
   }
 }
 
-async function onHospitalChange() {
-  selectedDate.value = '';
-  selectedTime.value = '';
-  await loadPlans();
-}
-
-async function onDateChange() {
-  selectedTime.value = '';
-}
-
-async function loadPlans() {
-  if (!selectedHospitalCode.value) {
-    plans.value = [];
-    return;
-  }
-  const hospital = hospitals.value.find(h => h.hospitalCode === selectedHospitalCode.value);
-  if (!hospital) return;
-
-  const result = await examinationApi.getPlans({
-    hospitalId: hospital.id,
-    packageId: currentPackage.value?.id,
-  });
-  if (result.code === 200) {
-    plans.value = result.data || [];
-  }
-}
-
 async function handleBook() {
-  if (!canBook.value || !selectedPlan.value) return;
+  if (!canBook.value) return;
   booking.value = true;
   try {
+    const hospital = hospitals.value.find(h => h.hospitalCode === selectedHospitalCode.value);
     const result = await examinationApi.bookExamination({
-      planId: selectedPlan.value.id,
       userId: user.value?.username || '',
       bookerName: bookerName.value,
       bookerPhone: bookerPhone.value,
       idCardNo: idCardNo.value,
       notes: '',
+      hospitalId: hospital?.id,
+      packageId: currentPackage.value?.id,
+      scheduleDate: selectedDate.value,
     });
     if (result.code === 200 && result.data) {
       bookingResult.value = result.data;

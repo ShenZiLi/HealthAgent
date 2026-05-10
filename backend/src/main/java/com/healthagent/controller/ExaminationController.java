@@ -8,10 +8,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,22 +64,6 @@ public class ExaminationController {
         } catch (Exception e) {
             log.error("查询套餐列表失败", e);
             return Result.error("查询套餐列表失败: " + e.getMessage());
-        }
-    }
-
-    @Operation(summary = "查询体检计划列表")
-    @GetMapping("/plans")
-    public Result<List<ExaminationPlanDTO>> getPlans(
-            @RequestParam(required = false) Long hospitalId,
-            @RequestParam(required = false) Long packageId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        try {
-            List<ExaminationPlanDTO> plans = examinationService.getAvailablePlans(hospitalId, packageId, startDate, endDate);
-            return Result.success(plans);
-        } catch (Exception e) {
-            log.error("查询体检计划失败", e);
-            return Result.error("查询体检计划失败: " + e.getMessage());
         }
     }
 

@@ -58,7 +58,7 @@ public class SmartChatService {
     }
 
     private boolean isExaminationQuery(String intent) {
-        return "book_examination".equals(intent) || 
+        return "book_examination".equals(intent) ||
                intent.contains("examination") ||
                intent.contains("体检") ||
                intent.contains("预约");
@@ -128,14 +128,14 @@ public class SmartChatService {
             bookingRequest.setPackageName(intentData.getPackageType());
             bookingRequest.setNotes(intentData.getNotes());
 
-            ExaminationBooking booking = examinationService.bookExamination(bookingRequest);
+            //ExaminationBooking booking = examinationService.bookExamination(bookingRequest);
 
-            response.setData(booking);
-            response.setAction("examination_booking_success");
-            response.setMessageType("examination_booking");
-
-            String bookingInfo = examinationService.formatBookingAsText(booking);
-            response.setMessage("✅ 体检预约成功！\n\n" + bookingInfo);
+            //response.setData(booking);
+            //response.setAction("examination_booking_success");
+            //response.setMessageType("examination_booking");
+            //
+            //String bookingInfo = examinationService.formatBookingAsText(booking);
+            //response.setMessage("✅ 体检预约成功！\n\n" + bookingInfo);
 
             return response;
 
