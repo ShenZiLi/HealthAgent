@@ -1,9 +1,9 @@
 package com.healthagent.service;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
-import com.alibaba.fastjson2.JSONObject;
+import com.healthagent.common.IntentType;
 import com.healthagent.dto.*;
+import com.healthagent.service.chat.AbstractChatClient;
+import com.healthagent.service.chat.ChatClientFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +25,8 @@ public class SmartChatService {
     @Autowired
     private ExaminationService examinationService;
 
+    private AbstractChatClient chatClient;
+
     @Value("${spring.ai.openai.base-url:https://open.bigmodel.cn}")
     private String baseUrl;
 
@@ -34,34 +36,38 @@ public class SmartChatService {
     @Value("${healthagent.chat.model:glm-4}")
     private String defaultModel;
 
+    @Value("${healthagent.chat.provider:glm}")
+    private String provider;
+
+    private AbstractChatClient getChatClient() {
+        if (chatClient == null) {
+            chatClient = ChatClientFactory.createClient(provider, apiKey, baseUrl, defaultModel);
+        }
+        return chatClient;
+    }
+
     public SmartChatResponse chat(SmartChatRequest request) {
         String userMessage = request.getMessage();
         String userId = request.getUserId();
 
         log.info("接收到用户消息: {}, userId: {}", userMessage, userId);
 
-        String intent = intentRecognitionService.recognizeIntent(userMessage);
-        log.info("识别到的意图: {}", intent);
+        IntentType intent = intentRecognitionService.recognizeIntent(userMessage);
+        log.info("识别到的意图: {}", intent.getDesc());
 
         SmartChatResponse response = new SmartChatResponse();
-        response.setIntent(intent);
+        response.setIntent(intent.getCode());
 
-        if (intentRecognitionService.isInsuranceQuery(intent)) {
-            return handleInsuranceQuery(userMessage, userId, response);
+        switch (intent) {
+            case QUERY_POLICY:
+                return handleInsuranceQuery(userMessage, userId, response);
+            case BOOK_EXAMINATION:
+                return handleExaminationBooking(userMessage, userId, response);
+            case HEALTH_CONSULTATION:
+            case GENERAL_CONVERSATION:
+            default:
+                return handleGeneralConversation(userMessage, userId, response);
         }
-
-        if (isExaminationQuery(intent)) {
-            return handleExaminationBooking(userMessage, userId, response);
-        }
-
-        return handleGeneralConversation(userMessage, userId, response);
-    }
-
-    private boolean isExaminationQuery(String intent) {
-        return "book_examination".equals(intent) ||
-               intent.contains("examination") ||
-               intent.contains("体检") ||
-               intent.contains("预约");
     }
 
     private SmartChatResponse handleInsuranceQuery(String userMessage, String userId, SmartChatResponse response) {
@@ -128,15 +134,6 @@ public class SmartChatService {
             bookingRequest.setPackageName(intentData.getPackageType());
             bookingRequest.setNotes(intentData.getNotes());
 
-            //ExaminationBooking booking = examinationService.bookExamination(bookingRequest);
-
-            //response.setData(booking);
-            //response.setAction("examination_booking_success");
-            //response.setMessageType("examination_booking");
-            //
-            //String bookingInfo = examinationService.formatBookingAsText(booking);
-            //response.setMessage("✅ 体检预约成功！\n\n" + bookingInfo);
-
             return response;
 
         } catch (Exception e) {
@@ -168,15 +165,19 @@ public class SmartChatService {
 
     private SmartChatResponse handleGeneralConversation(String userMessage, String userId, SmartChatResponse response) {
         try {
-            String aiResponse = callGLM(userMessage, userId);
+            String aiResponse = getChatClient().chat(
+                    userMessage,
+                    "你是健康助手AI客服，专注于为用户提供健康保险和体检预约相关的咨询和服务。回答要专业、友好、简洁。",
+                    userId
+            );
             response.setMessage(aiResponse);
             response.setAction("general_response");
             response.setMessageType("conversation");
             return response;
         } catch (Exception e) {
-            log.error("调用GLM失败", e);
+            log.error("调用大模型失败", e);
             response.setMessage("抱歉，我现在无法回答您的问题，请稍后再试。");
-            response.setAction("glm_call_failed");
+            response.setAction("chat_call_failed");
             response.setMessageType("error");
             return response;
         }
@@ -199,94 +200,10 @@ public class SmartChatService {
                 回复要简洁，自然，像一个专业的保险顾问。
                 """, policyInfo, userMessage);
 
-            return callGLM(prompt, null);
+            return getChatClient().chat(prompt, "你是一个专业的保险顾问助手。", null);
         } catch (Exception e) {
             log.error("生成保单回复失败", e);
             return policyInfo + "\n请问还有什么需要了解的吗？";
         }
-    }
-
-    private String callGLM(String userMessage, String userId) throws Exception {
-        String model = defaultModel;
-        String apiUrl = baseUrl + "/api/paas/v4/chat/completions";
-
-        JSONObject requestBody = new JSONObject();
-        requestBody.put("model", model);
-
-        java.util.List<JSONObject> messages = new java.util.ArrayList<>();
-
-        JSONObject systemMessage = new JSONObject();
-        systemMessage.put("role", "system");
-        systemMessage.put("content", "你是健康助手AI客服，专注于为用户提供健康保险和体检预约相关的咨询和服务。回答要专业、友好、简洁。");
-        messages.add(systemMessage);
-
-        if (userId != null) {
-            JSONObject userInfoMessage = new JSONObject();
-            userInfoMessage.put("role", "system");
-            userInfoMessage.put("content", "当前用户ID: " + userId);
-            messages.add(userInfoMessage);
-        }
-
-        JSONObject userMsg = new JSONObject();
-        userMsg.put("role", "user");
-        userMsg.put("content", userMessage);
-        messages.add(userMsg);
-
-        requestBody.put("messages", messages);
-        requestBody.put("stream", false);
-
-        String response = sendPostRequest(apiUrl, requestBody.toJSONString());
-        JSONObject responseJson = JSON.parseObject(response);
-
-        JSONArray choices = responseJson.getJSONArray("choices");
-        if (choices != null && !choices.isEmpty()) {
-            JSONObject choice = choices.getJSONObject(0);
-            JSONObject message = choice.getJSONObject("message");
-            return message.getString("content");
-        }
-
-        return "抱歉，我现在无法回答您的问题。";
-    }
-
-    private String sendPostRequest(String urlStr, String jsonBody) throws Exception {
-        java.net.URL url = new java.net.URL(urlStr);
-        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-        conn.setDoOutput(true);
-        conn.setDoInput(true);
-        conn.setConnectTimeout(30000);
-        conn.setReadTimeout(60000);
-
-        try (java.io.OutputStream os = conn.getOutputStream()) {
-            byte[] input = jsonBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
-        }
-
-        int responseCode = conn.getResponseCode();
-        if (responseCode != 200) {
-            try (java.io.BufferedReader br = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(conn.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = br.readLine()) != null) {
-                    response.append(line);
-                }
-                throw new RuntimeException("GLM API返回错误码: " + responseCode + ", 响应: " + response);
-            }
-        }
-
-        StringBuilder response = new StringBuilder();
-        try (java.io.BufferedReader br = new java.io.BufferedReader(
-                new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                response.append(line);
-            }
-        }
-
-        return response.toString();
     }
 }
