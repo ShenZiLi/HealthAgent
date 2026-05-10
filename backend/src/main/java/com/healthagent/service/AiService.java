@@ -24,7 +24,7 @@ public class AiService {
     private final boolean enabled;
     private final SessionManager sessionManager;
 
-    @Value("${healthagent.glm.model:glm-4.7-flash}")
+    @Value("${healthagent.chat.model:glm-4.7-flash}")
     private String model;
 
     @Autowired

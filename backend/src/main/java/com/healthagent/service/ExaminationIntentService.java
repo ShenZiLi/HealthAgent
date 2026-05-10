@@ -22,7 +22,7 @@ public class ExaminationIntentService {
     @Value("${spring.ai.openai.base-url:https://open.bigmodel.cn}")
     private String baseUrl;
 
-    @Value("${spring.ai.openai.api-key:}")
+    @Value("${healthagent.glm.api-key:}")
     private String apiKey;
 
     @Value("${healthagent.chat.model:glm-4}")
