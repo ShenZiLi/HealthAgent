@@ -1,6 +1,10 @@
 server:
   port: ${SERVER_PORT:8084}
 
+logging:
+  pattern:
+    console: "[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%thread] [%X{traceId}] [%-5level] [%logger{50}] - %msg%n"
+
 spring:
   application:
     name: HealthAgent
