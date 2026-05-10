@@ -1,22 +1,27 @@
 package com.healthagent.controller;
 
 import com.healthagent.common.Result;
-import com.healthagent.dto.ExaminationBooking;
-import com.healthagent.dto.ExaminationBookingRequest;
-import com.healthagent.dto.HospitalInfo;
+import com.healthagent.dto.*;
 import com.healthagent.service.ExaminationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
-@Slf4j
-@Tag(name = "体检预约接口")
+/**
+ * 体检预约控制器
+ */
+@Tag(name = "体检预约管理")
 @RestController
-@RequestMapping("/api/examination")
+@RequestMapping("/api/examinations")
+@Slf4j
 public class ExaminationController {
 
     @Autowired
@@ -24,149 +29,117 @@ public class ExaminationController {
 
     @Operation(summary = "获取可用医院列表")
     @GetMapping("/hospitals")
-    public Result<List<HospitalInfo>> getAvailableHospitals() {
+    public Result<List<ExaminationHospitalDTO>> getHospitals(@RequestParam(required = false) String keyword) {
         try {
-            List<HospitalInfo> hospitals = examinationService.getAvailableHospitals();
+            List<ExaminationHospitalDTO> hospitals;
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                hospitals = examinationService.searchHospitals(keyword);
+            } else {
+                hospitals = examinationService.getAvailableHospitals();
+            }
             return Result.success(hospitals);
         } catch (Exception e) {
-            log.error("获取医院列表失败", e);
-            return Result.error("获取医院列表失败: " + e.getMessage());
-        }
-    }
-
-    @Operation(summary = "搜索医院")
-    @GetMapping("/hospitals/search")
-    public Result<List<HospitalInfo>> searchHospitals(@RequestParam String keyword) {
-        try {
-            List<HospitalInfo> hospitals = examinationService.searchHospitals(keyword);
-            return Result.success(hospitals);
-        } catch (Exception e) {
-            log.error("搜索医院失败", e);
-            return Result.error("搜索医院失败: " + e.getMessage());
+            log.error("查询医院列表失败", e);
+            return Result.error("查询医院列表失败: " + e.getMessage());
         }
     }
 
     @Operation(summary = "获取医院详情")
     @GetMapping("/hospitals/{hospitalCode}")
-    public Result<HospitalInfo> getHospitalDetail(@PathVariable String hospitalCode) {
+    public Result<ExaminationHospitalDTO> getHospital(@PathVariable String hospitalCode) {
         try {
-            return examinationService.getHospitalByCode(hospitalCode)
-                .map(Result::success)
-                .orElse(Result.error("医院不存在"));
+            Optional<ExaminationHospitalDTO> hospital = examinationService.getHospitalByCode(hospitalCode);
+            return hospital.map(Result::success)
+                    .orElse(Result.error("医院不存在"));
         } catch (Exception e) {
-            log.error("获取医院详情失败", e);
-            return Result.error("获取医院详情失败: " + e.getMessage());
+            log.error("查询医院详情失败", e);
+            return Result.error("查询医院详情失败: " + e.getMessage());
         }
     }
 
-    @Operation(summary = "创建体检预约")
-    @PostMapping("/book")
-    public Result<ExaminationBooking> bookExamination(@RequestBody ExaminationBookingRequest request) {
+    @Operation(summary = "获取可用体检套餐列表")
+    @GetMapping("/packages")
+    public Result<List<ExaminationPackageDTO>> getPackages() {
         try {
-            if (request.getUserId() == null || request.getUserId().trim().isEmpty()) {
-                return Result.error("用户ID不能为空");
-            }
-            
-            if (request.getHospitalName() == null || request.getHospitalName().trim().isEmpty()) {
-                return Result.error("医院名称不能为空");
-            }
-            
-            if (request.getExaminationDate() == null || request.getExaminationDate().trim().isEmpty()) {
-                return Result.error("体检日期不能为空");
-            }
-            
-            if (!examinationService.isValidBookingDate(request.getExaminationDate())) {
-                return Result.error("体检日期无效，请选择未来3个月内的日期");
-            }
-            
-            ExaminationBooking booking = examinationService.bookExamination(request);
-            return Result.success(booking);
+            List<ExaminationPackageDTO> packages = examinationService.getAvailablePackages();
+            return Result.success(packages);
         } catch (Exception e) {
-            log.error("创建体检预约失败", e);
-            return Result.error("创建体检预约失败: " + e.getMessage());
+            log.error("查询套餐列表失败", e);
+            return Result.error("查询套餐列表失败: " + e.getMessage());
+        }
+    }
+
+    @Operation(summary = "查询体检计划列表")
+    @GetMapping("/plans")
+    public Result<List<ExaminationPlanDTO>> getPlans(
+            @RequestParam(required = false) Long hospitalId,
+            @RequestParam(required = false) Long packageId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            List<ExaminationPlanDTO> plans = examinationService.getAvailablePlans(hospitalId, packageId, startDate, endDate);
+            return Result.success(plans);
+        } catch (Exception e) {
+            log.error("查询体检计划失败", e);
+            return Result.error("查询体检计划失败: " + e.getMessage());
+        }
+    }
+
+    @Operation(summary = "体检预约")
+    @PostMapping("/book")
+    public Result<ExaminationBookingDTO> book(@Valid @RequestBody ExaminationBookingRequestDTO request) {
+        try {
+            ExaminationBookingDTO booking = examinationService.bookExamination(request);
+            return Result.success(booking);
+        } catch (RuntimeException e) {
+            log.warn("体检预约失败: {}", e.getMessage());
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("体检预约失败", e);
+            return Result.error("预约失败: " + e.getMessage());
         }
     }
 
     @Operation(summary = "获取预约详情")
-    @GetMapping("/booking/{bookingId}")
-    public Result<ExaminationBooking> getBookingDetail(@PathVariable String bookingId) {
+    @GetMapping("/bookings/{bookingNo}")
+    public Result<ExaminationBookingDTO> getBooking(@PathVariable String bookingNo) {
         try {
-            return examinationService.getBookingById(bookingId)
-                .map(Result::success)
-                .orElse(Result.error("预约不存在"));
+            Optional<ExaminationBookingDTO> booking = examinationService.getBookingByNo(bookingNo);
+            return booking.map(Result::success)
+                    .orElse(Result.error("预约不存在"));
         } catch (Exception e) {
-            log.error("获取预约详情失败", e);
-            return Result.error("获取预约详情失败: " + e.getMessage());
+            log.error("查询预约详情失败", e);
+            return Result.error("查询预约详情失败: " + e.getMessage());
         }
     }
 
     @Operation(summary = "获取用户预约列表")
-    @GetMapping("/bookings/{userId}")
-    public Result<List<ExaminationBooking>> getUserBookings(@PathVariable String userId) {
+    @GetMapping("/users/{userId}/bookings")
+    public Result<List<ExaminationBookingDTO>> getUserBookings(@PathVariable String userId) {
         try {
-            List<ExaminationBooking> bookings = examinationService.getUserBookings(userId);
+            List<ExaminationBookingDTO> bookings = examinationService.getUserBookings(userId);
             return Result.success(bookings);
         } catch (Exception e) {
-            log.error("获取用户预约列表失败", e);
-            return Result.error("获取用户预约列表失败: " + e.getMessage());
+            log.error("查询用户预约列表失败", e);
+            return Result.error("查询用户预约列表失败: " + e.getMessage());
         }
     }
 
     @Operation(summary = "取消预约")
-    @DeleteMapping("/booking/{bookingId}")
-    public Result<Void> cancelBooking(
-        @PathVariable String bookingId,
-        @RequestParam String userId
-    ) {
+    @DeleteMapping("/bookings/{bookingNo}")
+    public Result<Boolean> cancelBooking(@PathVariable String bookingNo, @RequestParam String userId) {
         try {
-            boolean success = examinationService.cancelBooking(bookingId, userId);
-            if (success) {
-                return Result.success();
-            } else {
-                return Result.error("取消预约失败，请检查预约ID或权限");
-            }
+            boolean success = examinationService.cancelBooking(bookingNo, userId);
+            return success ? Result.success(true) : Result.error("取消预约失败");
         } catch (Exception e) {
             log.error("取消预约失败", e);
             return Result.error("取消预约失败: " + e.getMessage());
         }
     }
 
-    @Operation(summary = "改签预约")
-    @PutMapping("/booking/{bookingId}/reschedule")
-    public Result<ExaminationBooking> rescheduleBooking(
-        @PathVariable String bookingId,
-        @RequestParam String userId,
-        @RequestParam String newDate,
-        @RequestParam(required = false) String newTime
-    ) {
-        try {
-            if (!examinationService.isValidBookingDate(newDate)) {
-                return Result.error("改签日期无效，请选择未来3个月内的日期");
-            }
-            
-            boolean success = examinationService.rescheduleBooking(bookingId, userId, newDate, newTime);
-            if (success) {
-                return examinationService.getBookingById(bookingId)
-                    .map(Result::success)
-                    .orElse(Result.error("预约不存在"));
-            } else {
-                return Result.error("改签预约失败，请检查预约ID或权限");
-            }
-        } catch (Exception e) {
-            log.error("改签预约失败", e);
-            return Result.error("改签预约失败: " + e.getMessage());
-        }
-    }
-
     @Operation(summary = "获取预约须知")
     @GetMapping("/requirements")
-    public Result<String> getBookingRequirements() {
-        try {
-            String requirements = examinationService.getBookingRequirements();
-            return Result.success(requirements);
-        } catch (Exception e) {
-            log.error("获取预约须知失败", e);
-            return Result.error("获取预约须知失败: " + e.getMessage());
-        }
+    public Result<String> getRequirements() {
+        return Result.success(examinationService.getBookingRequirements());
     }
 }
