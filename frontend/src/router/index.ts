@@ -3,6 +3,9 @@ import LoginPage from '@/pages/LoginPage.vue'
 import DashboardPage from '@/pages/DashboardPage.vue'
 import ChatPage from '@/pages/ChatPage.vue'
 import PolicyPage from '@/pages/PolicyPage.vue'
+import ExaminationPackagesPage from '@/pages/ExaminationPackagesPage.vue'
+import ExaminationDetailPage from '@/pages/ExaminationDetailPage.vue'
+import ExaminationBookingsPage from '@/pages/ExaminationBookingsPage.vue'
 import { useAuth } from '@/composables/useAuth'
 
 const routes: RouteRecordRaw[] = [
@@ -28,6 +31,24 @@ const routes: RouteRecordRaw[] = [
     path: '/policy',
     name: 'policy',
     component: PolicyPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/examination/packages',
+    name: 'examination-packages',
+    component: ExaminationPackagesPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/examination/detail',
+    name: 'examination-detail',
+    component: ExaminationDetailPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/examination/bookings',
+    name: 'examination-bookings',
+    component: ExaminationBookingsPage,
     meta: { requiresAuth: true },
   },
   {

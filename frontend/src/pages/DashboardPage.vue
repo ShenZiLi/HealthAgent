@@ -51,6 +51,19 @@
           <p class="text-slate-500 mt-1">查看您的保单信息</p>
         </div>
 
+        <div
+          @click="router.push('/examination/packages')"
+          class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+        >
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+              <Stethoscope class="w-6 h-6 text-teal-600" />
+            </div>
+          </div>
+          <h3 class="text-lg font-semibold text-slate-800">体检预约</h3>
+          <p class="text-slate-500 mt-1">查看套餐、预约体检</p>
+        </div>
+
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
           <div class="flex items-center justify-between mb-4">
             <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -59,16 +72,6 @@
           </div>
           <h3 class="text-lg font-semibold text-slate-800">健康数据</h3>
           <p class="text-slate-500 mt-1">查看您的健康记录和统计数据</p>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
-          <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <CalendarCheck class="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-          <h3 class="text-lg font-semibold text-slate-800">预约管理</h3>
-          <p class="text-slate-500 mt-1">管理您的健康预约和日程</p>
         </div>
       </div>
 
@@ -87,7 +90,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
-import { User, LogOut, HeartPulse, Shield, Activity, CalendarCheck, Settings } from 'lucide-vue-next';
+import { User, LogOut, HeartPulse, Shield, Stethoscope, Activity } from 'lucide-vue-next';
 
 const router = useRouter();
 const { user, logout } = useAuth();

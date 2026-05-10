@@ -71,7 +71,7 @@
         </form>
 
         <div class="mt-6 text-center text-sm text-slate-500">
-          <p>默认账户: admin / admin123</p>
+          <p>默认账户: admin / admin123 / 张三 / 110101199001011234</p>
         </div>
       </div>
     </div>
