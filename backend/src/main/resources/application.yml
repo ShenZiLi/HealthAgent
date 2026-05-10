@@ -73,6 +73,8 @@ healthagent:
     jwt-secret: ${JWT_SECRET:}
     access-token-expiration-minutes: 120
     refresh-token-expiration-hours: 168
+    # 认证拦截器开关，设为 false 可跳过鉴权（仅调试使用）
+    interceptor-enabled: ${AUTH_INTERCEPTOR_ENABLED:false}
   # 默认管理员账户（生产环境必须修改或禁用）
   # 通过环境变量 APP_AUTH_DEFAULT_USERNAME 和 APP_AUTH_DEFAULT_PASSWORD 配置
   # 留空则禁用默认账户，必须通过注册功能创建账户

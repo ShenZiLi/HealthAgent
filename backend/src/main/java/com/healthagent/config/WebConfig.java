@@ -21,6 +21,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Value("${healthagent.cors.allowed-origin-patterns:http://localhost:*,http://127.0.0.1:*}")
     private String allowedOriginPatterns;
+
+    @Value("${healthagent.auth.interceptor-enabled:true}")
+    private boolean authInterceptorEnabled;
     
     @Override
     public void addCorsMappings(CorsRegistry registry) {
@@ -41,8 +44,10 @@ public class WebConfig implements WebMvcConfigurer {
     
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(authInterceptor)
-                .addPathPatterns("/api/**")
-                .excludePathPatterns("/api/auth/login", "/api/auth/refresh", "/api/auth/current", "/api/chat/**", "/api/node-types", "/swagger-ui/**", "/v3/api-docs/**");
+        if (authInterceptorEnabled) {
+            registry.addInterceptor(authInterceptor)
+                    .addPathPatterns("/api/**")
+                    .excludePathPatterns("/api/auth/login", "/api/auth/refresh", "/api/auth/current", "/api/chat/**", "/api/node-types", "/swagger-ui/**", "/v3/api-docs/**");
+        }
     }
 }
