@@ -6,9 +6,12 @@
           <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
             <HeartPulse class="w-6 h-6" />
           </div>
-          <h1 class="text-xl font-bold">健康智助手</h1>
+          <h1 class="text-xl font-bold">健康助手</h1>
         </div>
         <div class="flex items-center space-x-2">
+          <button @click="router.push('/dashboard')" class="p-2 hover:bg-white/20 rounded-full transition-colors" title="首页">
+            <Home class="w-5 h-5" />
+          </button>
           <button @click="showMenu = !showMenu" class="p-2 hover:bg-white/20 rounded-full transition-colors">
             <MoreVertical class="w-5 h-5" />
           </button>
@@ -132,7 +135,8 @@ import {
   FileText,
   Stethoscope,
   Mic,
-  Send
+  Send,
+  Home
 } from 'lucide-vue-next';
 
 const router = useRouter();

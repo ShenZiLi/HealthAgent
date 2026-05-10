@@ -64,14 +64,17 @@
           <p class="text-slate-500 mt-1">查看套餐、预约体检</p>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+        <div
+          @click="router.push('/chat')"
+          class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+        >
           <div class="flex items-center justify-between mb-4">
-            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Activity class="w-6 h-6 text-green-600" />
+            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Bot class="w-6 h-6 text-purple-600" />
             </div>
           </div>
-          <h3 class="text-lg font-semibold text-slate-800">健康数据</h3>
-          <p class="text-slate-500 mt-1">查看您的健康记录和统计数据</p>
+          <h3 class="text-lg font-semibold text-slate-800">AI助手</h3>
+          <p class="text-slate-500 mt-1">智能问答与健康服务</p>
         </div>
       </div>
 
@@ -90,7 +93,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
-import { User, LogOut, HeartPulse, Shield, Stethoscope, Activity } from 'lucide-vue-next';
+import { User, LogOut, HeartPulse, Shield, Stethoscope, Bot } from 'lucide-vue-next';
 
 const router = useRouter();
 const { user, logout } = useAuth();
