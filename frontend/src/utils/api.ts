@@ -18,8 +18,27 @@ async function fetchRequest<T>(url: string, options: RequestInit = {}): Promise<
     headers,
   });
 
-  const data = await response.json();
-  return data;
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    const text = await response.text();
+    throw new Error(`Expected JSON response, but got: ${text || 'Empty response'}`);
+  }
+
+  const text = await response.text();
+  if (!text) {
+    throw new Error('Empty response body');
+  }
+
+  try {
+    const data = JSON.parse(text);
+    return data;
+  } catch (e) {
+    throw new Error(`Failed to parse JSON: ${text.substring(0, 100)}...`);
+  }
 }
 
 export const authApi = {
