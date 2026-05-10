@@ -2,9 +2,9 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import LoginPage from '@/pages/LoginPage.vue'
 import DashboardPage from '@/pages/DashboardPage.vue'
 import ChatPage from '@/pages/ChatPage.vue'
+import PolicyPage from '@/pages/PolicyPage.vue'
 import { useAuth } from '@/composables/useAuth'
 
-// 定义路由配置
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -22,6 +22,12 @@ const routes: RouteRecordRaw[] = [
     path: '/chat',
     name: 'chat',
     component: ChatPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/policy',
+    name: 'policy',
+    component: PolicyPage,
     meta: { requiresAuth: true },
   },
   {

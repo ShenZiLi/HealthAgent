@@ -5,6 +5,8 @@ export interface LoginRequest {
 
 export interface UserInfo {
   username: string;
+  idCardNo?: string;
+  realName?: string;
 }
 
 export interface LoginResponse {

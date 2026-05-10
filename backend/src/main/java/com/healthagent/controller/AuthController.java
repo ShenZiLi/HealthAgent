@@ -28,7 +28,7 @@ public class AuthController {
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthService.AuthTokens tokens = authService.login(request.getUsername(), request.getPassword());
         if (tokens != null) {
-            LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo(request.getUsername());
+            LoginResponse.UserInfo userInfo = buildUserInfo(request.getUsername());
             LoginResponse response = new LoginResponse(tokens.accessToken(), tokens.refreshToken(), userInfo);
             return Result.success(response);
         }
@@ -54,7 +54,7 @@ public class AuthController {
             return Result.unauthorized("Refresh Token 无效或已过期");
         }
 
-        LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo(tokens.username());
+        LoginResponse.UserInfo userInfo = buildUserInfo(tokens.username());
         return Result.success(new LoginResponse(tokens.accessToken(), tokens.refreshToken(), userInfo));
     }
     
@@ -66,9 +66,16 @@ public class AuthController {
             token = token.substring(7);
             String username = authService.getUsernameByToken(token);
             if (username != null) {
-                return Result.success(new LoginResponse.UserInfo(username));
+                return Result.success(buildUserInfo(username));
             }
         }
         return Result.unauthorized("未认证");
+    }
+
+    private LoginResponse.UserInfo buildUserInfo(String username) {
+        if ("admin".equals(username)) {
+            return new LoginResponse.UserInfo(username, "110101199001011234", "张三");
+        }
+        return new LoginResponse.UserInfo(username);
     }
 }

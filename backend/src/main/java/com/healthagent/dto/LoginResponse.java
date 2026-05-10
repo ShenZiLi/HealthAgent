@@ -2,6 +2,7 @@ package com.healthagent.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * 登录响应 DTO
@@ -27,7 +28,14 @@ public class LoginResponse {
     
     @Data
     @AllArgsConstructor
+    @NoArgsConstructor
     public static class UserInfo {
         private String username;
+        private String idCardNo;
+        private String realName;
+
+        public UserInfo(String username) {
+            this.username = username;
+        }
     }
 }
