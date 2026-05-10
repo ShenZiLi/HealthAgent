@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import LoginPage from '@/pages/LoginPage.vue'
 import DashboardPage from '@/pages/DashboardPage.vue'
+import ChatPage from '@/pages/ChatPage.vue'
 import { useAuth } from '@/composables/useAuth'
 
 // 定义路由配置
@@ -18,8 +19,14 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/chat',
+    name: 'chat',
+    component: ChatPage,
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/',
-    redirect: '/dashboard',
+    redirect: '/chat',
   },
 ]
 
@@ -39,7 +46,7 @@ router.beforeEach(async (to, _from, next) => {
   if (to.meta.requiresAuth && !isAuthenticated.value) {
     next('/login')
   } else if (to.path === '/login' && isAuthenticated.value) {
-    next('/dashboard')
+    next('/chat')
   } else {
     next()
   }

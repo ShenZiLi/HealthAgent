@@ -97,7 +97,7 @@ async function handleLogin() {
   try {
     const success = await login(username.value, password.value);
     if (success) {
-      router.push('/dashboard');
+      router.push('/chat');
     }
   } catch (e) {
     errorMessage.value = e instanceof Error ? e.message : '登录失败，请稍后重试';
