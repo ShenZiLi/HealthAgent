@@ -34,11 +34,7 @@ spring:
   jackson:
     time-zone: GMT+8
     date-format: yyyy-MM-dd HH:mm:ss
-  ai:
-    openai:
-      # 占位配置，实际使用时通过节点配置动态指定
-      api-key: ${OPENAI_API_KEY:sk-placeholder}
-      base-url: https://api.openai.com
+  # GLM-4.7-Flash 配置 - 使用智谱AI官方SDK (zai-sdk)
   output:
     ansi:
       enabled: always  # 强制开启 ANSI 彩色输出
@@ -84,3 +80,7 @@ healthagent:
   default-password: ${APP_AUTH_DEFAULT_PASSWORD:admin123}
   skills:
     path: skills
+  # GLM-4.7-Flash 模型配置
+  glm:
+    api-key: ${GLM_API_KEY:3ec488cb4e07423891b08990accb1258.z2vVKbQPgcFTf5Br}
+    model: ${GLM_MODEL:glm-4-flash}

@@ -1,46 +1,41 @@
 package com.healthagent.controller;
 
 import com.healthagent.common.Result;
-import com.healthagent.dto.ChatRequest;
-import com.healthagent.dto.ChatResponse;
-import com.healthagent.service.ChatService;
+import com.healthagent.service.AiService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
-@Slf4j
-@Tag(name = "对话接口")
+/**
+ * AI聊天控制器
+ */
+@Tag(name = "AI聊天接口")
 @RestController
 @RequestMapping("/api/chat")
 public class ChatController {
 
     @Autowired
-    private ChatService chatService;
+    private AiService aiService;
 
-    @Operation(summary = "发送对话消息")
-    @PostMapping("/send")
-    public Result<ChatResponse> sendMessage(@Valid @RequestBody ChatRequest request) {
-        try {
-            ChatResponse response = chatService.chat(request);
-            return Result.success(response);
-        } catch (Exception e) {
-            log.error("对话请求失败", e);
-            return Result.error("对话失败: " + e.getMessage());
-        }
+    @Operation(summary = "健康助手聊天")
+    @PostMapping("/health")
+    public Result<String> healthChat(@RequestBody String message) {
+        String response = aiService.healthChat(message);
+        return Result.success(response);
     }
 
-    @Operation(summary = "发送对话消息(流式)")
-    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public String sendMessageStream(@Valid @RequestBody ChatRequest request) {
-        try {
-            return chatService.chatStream(request);
-        } catch (Exception e) {
-            log.error("流式对话请求失败", e);
-            return "data: {\"error\": \"" + e.getMessage() + "\"}\n\n";
-        }
+    @Operation(summary = "通用聊天")
+    @PostMapping
+    public Result<String> chat(@RequestBody String message) {
+        String response = aiService.chat(message);
+        return Result.success(response);
+    }
+
+    @Operation(summary = "带系统提示词的聊天")
+    @PostMapping("/custom")
+    public Result<String> customChat(@RequestParam String systemPrompt, @RequestBody String message) {
+        String response = aiService.chatWithSystemPrompt(systemPrompt, message);
+        return Result.success(response);
     }
 }
