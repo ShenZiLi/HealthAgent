@@ -6,6 +6,7 @@ import ai.z.openapi.service.model.ChatCompletionResponse;
 import ai.z.openapi.service.model.ChatMessage;
 import ai.z.openapi.service.model.ChatMessageRole;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -21,11 +22,14 @@ public class AiService {
 
     private final ZhipuAiClient client;
     private final boolean enabled;
+    private final SessionManager sessionManager;
 
-    @Value("${healthagent.glm.model:glm-4-flash}")
+    @Value("${healthagent.glm.model:glm-4.7-flash}")
     private String model;
 
-    public AiService(@Value("${healthagent.glm.api-key:}") String apiKey) {
+    @Autowired
+    public AiService(@Value("${healthagent.glm.api-key:}") String apiKey, SessionManager sessionManager) {
+        this.sessionManager = sessionManager;
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("GLM_API_KEY 未配置，AI服务将不可用");
             this.client = null;
@@ -190,5 +194,90 @@ public class AiService {
             log.error("AI多轮对话请求失败: {}", e.getMessage(), e);
             throw new RuntimeException("AI服务调用失败: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 会话聊天 - 支持持续对话带上下文
+     *
+     * @param sessionId 会话ID
+     * @param message 用户输入的消息
+     * @return AI返回的响应
+     */
+    public String sessionChat(String sessionId, String message) {
+        if (!enabled) {
+            throw new IllegalStateException("AI服务未配置，请设置 GLM_API_KEY 环境变量");
+        }
+
+        if (sessionId == null || sessionId.isBlank()) {
+            sessionId = sessionManager.createSession();
+            log.info("自动创建新会话: {}", sessionId);
+        }
+
+        log.info("AI会话聊天 [会话ID: {}, 消息数: {}]: {}", sessionId, sessionManager.getMessageCount(sessionId), message);
+        
+        ChatMessage userMessage = ChatMessage.builder()
+                .role(ChatMessageRole.USER.value())
+                .content(message)
+                .build();
+        sessionManager.addMessage(sessionId, userMessage);
+
+        List<ChatMessage> messages = sessionManager.getSessionHistory(sessionId);
+        
+        ChatCompletionCreateParams request = ChatCompletionCreateParams.builder()
+                .model(model)
+                .messages(messages)
+                .build();
+
+        try {
+            ChatCompletionResponse response = client.chat().createChatCompletion(request);
+            
+            if (response.isSuccess() && response.getData() != null && response.getData().getChoices() != null && !response.getData().getChoices().isEmpty()) {
+                String content = (String) response.getData().getChoices().get(0).getMessage().getContent();
+                log.info("AI会话响应 [会话ID: {}]: {}", sessionId, content);
+                
+                ChatMessage assistantMessage = ChatMessage.builder()
+                        .role(ChatMessageRole.ASSISTANT.value())
+                        .content(content)
+                        .build();
+                sessionManager.addMessage(sessionId, assistantMessage);
+                
+                return content;
+            } else {
+                String error = response.getMsg();
+                log.error("AI会话请求失败 [会话ID: {}]: {}", sessionId, error);
+                throw new RuntimeException("AI服务调用失败: " + error);
+            }
+        } catch (Exception e) {
+            log.error("AI会话请求失败 [会话ID: {}]: {}", sessionId, e.getMessage(), e);
+            throw new RuntimeException("AI服务调用失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 创建新会话
+     *
+     * @return 会话ID
+     */
+    public String createSession() {
+        return sessionManager.createSession();
+    }
+
+    /**
+     * 清除会话
+     *
+     * @param sessionId 会话ID
+     */
+    public void clearSession(String sessionId) {
+        sessionManager.clearSession(sessionId);
+    }
+
+    /**
+     * 获取会话历史消息数
+     *
+     * @param sessionId 会话ID
+     * @return 消息数量
+     */
+    public int getSessionMessageCount(String sessionId) {
+        return sessionManager.getMessageCount(sessionId);
     }
 }

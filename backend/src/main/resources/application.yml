@@ -83,4 +83,4 @@ healthagent:
   # GLM-4.7-Flash 模型配置
   glm:
     api-key: ${GLM_API_KEY:3ec488cb4e07423891b08990accb1258.z2vVKbQPgcFTf5Br}
-    model: ${GLM_MODEL:glm-4-flash}
+    model: ${GLM_MODEL:glm-4.7-flash}
