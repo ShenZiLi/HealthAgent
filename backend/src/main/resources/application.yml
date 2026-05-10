@@ -3,7 +3,9 @@ server:
 
 logging:
   pattern:
-    console: "[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%thread] [%X{traceId}] [%-5level] [%logger{50}] - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight([%-5level]) [%yellow(%X{traceId})] [%thread] %cyan([%logger{50}]) - %msg%n"
+  level:
+    root: INFO
 
 spring:
   application:
