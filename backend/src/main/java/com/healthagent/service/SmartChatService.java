@@ -3,8 +3,7 @@ package com.healthagent.service;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.healthagent.dto.SmartChatRequest;
-import com.healthagent.dto.SmartChatResponse;
+import com.healthagent.dto.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +18,12 @@ public class SmartChatService {
 
     @Autowired
     private PolicyService policyService;
+
+    @Autowired
+    private ExaminationIntentService examinationIntentService;
+
+    @Autowired
+    private ExaminationService examinationService;
 
     @Value("${spring.ai.openai.base-url:https://open.bigmodel.cn}")
     private String baseUrl;
@@ -45,7 +50,18 @@ public class SmartChatService {
             return handleInsuranceQuery(userMessage, userId, response);
         }
 
+        if (isExaminationQuery(intent)) {
+            return handleExaminationBooking(userMessage, userId, response);
+        }
+
         return handleGeneralConversation(userMessage, userId, response);
+    }
+
+    private boolean isExaminationQuery(String intent) {
+        return "book_examination".equals(intent) || 
+               intent.contains("examination") ||
+               intent.contains("体检") ||
+               intent.contains("预约");
     }
 
     private SmartChatResponse handleInsuranceQuery(String userMessage, String userId, SmartChatResponse response) {
@@ -79,6 +95,77 @@ public class SmartChatService {
         }
     }
 
+    private SmartChatResponse handleExaminationBooking(String userMessage, String userId, SmartChatResponse response) {
+        if (userId == null || userId.trim().isEmpty()) {
+            response.setMessage("我需要您的用户ID才能为您预约体检，请问您的用户ID是多少？");
+            response.setNeedsMoreInfo(true);
+            response.setAction("require_user_id");
+            response.setMessageType("info_request");
+            return response;
+        }
+
+        try {
+            log.info("识别体检预约意图");
+            ExaminationIntentData intentData = examinationIntentService.recognizeExaminationIntent(userMessage);
+
+            if (intentData.getNeedsMoreInfo() != null && intentData.getNeedsMoreInfo()) {
+                String missingInfo = buildMissingInfoMessage(intentData);
+                response.setMessage(missingInfo);
+                response.setNeedsMoreInfo(true);
+                response.setAction("require_examination_info");
+                response.setMessageType("info_request");
+                return response;
+            }
+
+            log.info("创建体检预约: hospital={}, date={}", intentData.getHospitalName(), intentData.getExaminationDate());
+
+            ExaminationBookingRequest bookingRequest = new ExaminationBookingRequest();
+            bookingRequest.setUserId(userId);
+            bookingRequest.setHospitalName(intentData.getHospitalName());
+            bookingRequest.setHospitalCode(intentData.getHospitalCode());
+            bookingRequest.setExaminationDate(intentData.getExaminationDate());
+            bookingRequest.setExaminationTime(intentData.getExaminationTime());
+            bookingRequest.setPackageName(intentData.getPackageType());
+            bookingRequest.setNotes(intentData.getNotes());
+
+            ExaminationBooking booking = examinationService.bookExamination(bookingRequest);
+
+            response.setData(booking);
+            response.setAction("examination_booking_success");
+            response.setMessageType("examination_booking");
+
+            String bookingInfo = examinationService.formatBookingAsText(booking);
+            response.setMessage("✅ 体检预约成功！\n\n" + bookingInfo);
+
+            return response;
+
+        } catch (Exception e) {
+            log.error("体检预约失败", e);
+            response.setMessage("抱歉，预约体检时出现了问题，请稍后再试。错误信息：" + e.getMessage());
+            response.setAction("examination_booking_failed");
+            response.setMessageType("error");
+            return response;
+        }
+    }
+
+    private String buildMissingInfoMessage(ExaminationIntentData intentData) {
+        StringBuilder message = new StringBuilder("为了帮您预约体检，请提供以下信息：\n\n");
+
+        if (intentData.getMissingFields() != null && intentData.getMissingFields().contains("hospitalName")) {
+            message.append("🏥 医院名称：您想去哪家医院体检？\n");
+            message.append("   可选医院：北京协和医院、301医院、北大医院、中山医院等\n\n");
+        }
+
+        if (intentData.getMissingFields() != null && intentData.getMissingFields().contains("examinationDate")) {
+            message.append("📅 体检日期：您想哪天去体检？\n");
+            message.append("   例如：明天、后天、2024-02-15\n\n");
+        }
+
+        message.append("请告诉我这些信息，我来帮您预约！");
+
+        return message.toString();
+    }
+
     private SmartChatResponse handleGeneralConversation(String userMessage, String userId, SmartChatResponse response) {
         try {
             String aiResponse = callGLM(userMessage, userId);
@@ -109,7 +196,7 @@ public class SmartChatService {
                 
                 用户原问题：%s
                 
-                回复要简洁、自然，像一个专业的保险顾问。
+                回复要简洁，自然，像一个专业的保险顾问。
                 """, policyInfo, userMessage);
 
             return callGLM(prompt, null);
@@ -130,7 +217,7 @@ public class SmartChatService {
 
         JSONObject systemMessage = new JSONObject();
         systemMessage.put("role", "system");
-        systemMessage.put("content", "你是健康助手AI客服，专注于为用户提供健康保险相关的咨询和服务。回答要专业、友好、简洁。");
+        systemMessage.put("content", "你是健康助手AI客服，专注于为用户提供健康保险和体检预约相关的咨询和服务。回答要专业、友好、简洁。");
         messages.add(systemMessage);
 
         if (userId != null) {
