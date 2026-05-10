@@ -47,35 +47,6 @@ public class QwenChatClient extends AbstractChatClient {
     }
 
     @Override
-    protected String buildRequestBodyWithFunction(List<ChatMessage> messages, String functionDefinition) {
-        JSONObject requestBody = new JSONObject();
-        requestBody.put("model", model);
-
-        // 千问 API 使用 "input" 嵌套结构
-        JSONObject input = new JSONObject();
-        JSONArray messageArray = new JSONArray();
-        for (ChatMessage msg : messages) {
-            JSONObject msgObj = new JSONObject();
-            msgObj.put("role", msg.getRole());
-            msgObj.put("content", msg.getContent());
-            messageArray.add(msgObj);
-        }
-        input.put("messages", messageArray);
-        requestBody.put("input", input);
-
-        // 千问使用 tools 字段
-        JSONObject functionDef = JSON.parseObject(functionDefinition);
-        JSONArray tools = new JSONArray();
-        JSONObject tool = new JSONObject();
-        tool.put("type", "function");
-        tool.put("function", functionDef);
-        tools.add(tool);
-        requestBody.put("tools", tools);
-
-        return requestBody.toJSONString();
-    }
-
-    @Override
     protected String callApi(String requestBody) throws Exception {
         String apiUrl = baseUrl + "/api/v1/services/aigc/text-generation/generation";
         URL url = new URL(apiUrl);
@@ -138,30 +109,6 @@ public class QwenChatClient extends AbstractChatClient {
             }
         }
         return "抱歉，我现在无法回答您的问题。";
-    }
-
-    @Override
-    protected String parseFunctionCallResponse(String rawResponse) throws Exception {
-        JSONObject responseJson = JSON.parseObject(rawResponse);
-        // 千问响应格式: output.choices[0].message.tool_calls
-        JSONObject output = responseJson.getJSONObject("output");
-        if (output != null) {
-            JSONArray choices = output.getJSONArray("choices");
-            if (choices != null && !choices.isEmpty()) {
-                JSONObject choice = choices.getJSONObject(0);
-                JSONObject message = choice.getJSONObject("message");
-                JSONArray toolCalls = message.getJSONArray("tool_calls");
-                if (toolCalls != null && !toolCalls.isEmpty()) {
-                    JSONObject toolCall = toolCalls.getJSONObject(0);
-                    JSONObject function = toolCall.getJSONObject("function");
-                    String arguments = function.getString("arguments");
-                    return arguments != null ? arguments : "";
-                }
-                String content = message.getString("content");
-                return content != null ? content : "";
-            }
-        }
-        return "";
     }
 
     @Override

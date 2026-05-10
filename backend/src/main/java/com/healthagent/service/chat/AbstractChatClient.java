@@ -42,43 +42,11 @@ public abstract class AbstractChatClient {
     }
 
     /**
-     * 模板方法：执行带function calling的聊天
-     * 定义标准流程：构建消息（含function定义） → 调用API → 解析function调用结果
-     */
-    public String chatWithFunctionCall(String userMessage, String functionDefinition, String userId) {
-        log.info("[{}] 发送function calling请求: {}", getModelName(), userMessage);
-        try {
-            List<ChatMessage> messages = buildMessagesForFunctionCall(userMessage, functionDefinition, userId);
-            String requestBody = buildRequestBodyWithFunction(messages, functionDefinition);
-            String rawResponse = callApi(requestBody);
-            String result = parseFunctionCallResponse(rawResponse);
-            log.info("[{}] function calling响应: {}", getModelName(), result);
-            return result;
-        } catch (Exception e) {
-            log.error("[{}] function calling请求失败", getModelName(), e);
-            return "";
-        }
-    }
-
-    /**
      * 构建消息列表（可被子类覆盖）
      */
     protected List<ChatMessage> buildMessages(String systemPrompt, String userMessage, String userId) {
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(new ChatMessage("system", systemPrompt != null ? systemPrompt : getDefaultSystemPrompt()));
-        if (userId != null && !userId.isEmpty()) {
-            messages.add(new ChatMessage("system", "当前用户ID: " + userId));
-        }
-        messages.add(new ChatMessage("user", userMessage));
-        return messages;
-    }
-
-    /**
-     * 构建function calling的消息列表（可被子类覆盖）
-     */
-    protected List<ChatMessage> buildMessagesForFunctionCall(String userMessage, String functionDefinition, String userId) {
-        List<ChatMessage> messages = new ArrayList<>();
-        messages.add(new ChatMessage("system", "你是一个信息提取助手。请根据用户的输入，调用指定的函数提取相关信息。"));
         if (userId != null && !userId.isEmpty()) {
             messages.add(new ChatMessage("system", "当前用户ID: " + userId));
         }
@@ -118,18 +86,6 @@ public abstract class AbstractChatClient {
     protected abstract String buildRequestBody(List<ChatMessage> messages);
 
     /**
-     * 构建带function calling的请求体JSON字符串（子类可覆盖实现）
-     *
-     * @param messages 消息列表
-     * @param functionDefinition function定义的JSON字符串
-     * @return 请求体JSON字符串
-     */
-    protected String buildRequestBodyWithFunction(List<ChatMessage> messages, String functionDefinition) {
-        // 默认实现：调用普通的buildRequestBody
-        return buildRequestBody(messages);
-    }
-
-    /**
      * 调用底层API
      *
      * @param requestBody 请求体JSON字符串
@@ -146,15 +102,6 @@ public abstract class AbstractChatClient {
      * @throws Exception 解析异常
      */
     protected abstract String parseResponse(String rawResponse) throws Exception;
-
-    /**
-     * 解析function calling的API响应，提取function调用的参数（子类必须实现）
-     *
-     * @param rawResponse 原始响应字符串
-     * @return 提取的function参数JSON字符串
-     * @throws Exception 解析异常
-     */
-    protected abstract String parseFunctionCallResponse(String rawResponse) throws Exception;
 
     /**
      * 消息封装类
