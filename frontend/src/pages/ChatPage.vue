@@ -100,7 +100,14 @@
       </div>
 
       <div class="flex items-center space-x-3">
-        <button class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
+        <button
+          @click="toggleVoiceInput"
+          :class="[
+            'p-2 rounded-full transition-colors',
+            isRecording ? 'text-red-500 bg-red-50 animate-pulse' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+          ]"
+          :title="isRecording ? '点击停止录音' : '语音输入'"
+        >
           <Mic class="w-6 h-6" />
         </button>
         <div class="flex-1 relative">
@@ -125,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import {
@@ -146,6 +153,7 @@ const messageContainer = ref<HTMLElement | null>(null);
 const showMenu = ref(false);
 const inputMessage = ref('');
 const isLoading = ref(false);
+const isRecording = ref(false);
 const messages = ref<Array<{ content: string; isUser: boolean; time: string }>>([]);
 
 const welcomeMessage = '您好！我是健康智助手，很高兴为您服务。请问有什么可以帮您？';
@@ -165,6 +173,70 @@ const userInitial = computed(() => {
   }
   return '?';
 });
+
+let recognition: any = null;
+
+function initSpeechRecognition() {
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    return false;
+  }
+  recognition = new SpeechRecognition();
+  recognition.lang = 'zh-CN';
+  recognition.interimResults = true;
+  recognition.continuous = false;
+
+  recognition.onresult = (event: any) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    inputMessage.value = transcript;
+  };
+
+  recognition.onerror = (event: any) => {
+    console.error('语音识别错误:', event.error);
+    isRecording.value = false;
+    if (event.error === 'not-allowed') {
+      alert('请允许浏览器使用麦克风');
+    }
+  };
+
+  recognition.onend = () => {
+    isRecording.value = false;
+  };
+
+  return true;
+}
+
+function toggleVoiceInput() {
+  if (isRecording.value) {
+    stopVoiceInput();
+  } else {
+    startVoiceInput();
+  }
+}
+
+function startVoiceInput() {
+  if (!recognition && !initSpeechRecognition()) {
+    alert('您的浏览器不支持语音输入功能');
+    return;
+  }
+  isRecording.value = true;
+  try {
+    recognition.start();
+  } catch (e) {
+    isRecording.value = false;
+    console.error('启动语音识别失败:', e);
+  }
+}
+
+function stopVoiceInput() {
+  if (recognition) {
+    recognition.stop();
+  }
+  isRecording.value = false;
+}
 
 function getCurrentTime() {
   const now = new Date();
@@ -256,5 +328,10 @@ function scrollToBottom() {
 
 onMounted(() => {
   scrollToBottom();
+  initSpeechRecognition();
+});
+
+onUnmounted(() => {
+  stopVoiceInput();
 });
 </script>
