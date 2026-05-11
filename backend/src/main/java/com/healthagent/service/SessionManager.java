@@ -2,6 +2,7 @@ package com.healthagent.service;
 
 import ai.z.openapi.service.model.ChatMessage;
 import com.healthagent.common.IntentType;
+import com.healthagent.dto.ExaminationIntentData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ public class SessionManager {
 
     private final Map<String, List<ChatMessage>> sessionHistory = new ConcurrentHashMap<>();
     private final Map<String, IntentType> userIntentCache = new ConcurrentHashMap<>();
+    private final Map<String, ExaminationIntentData> examinationBookingCache = new ConcurrentHashMap<>();
 
     public String createSession() {
         String sessionId = UUID.randomUUID().toString();
@@ -78,6 +80,74 @@ public class SessionManager {
         if (userId != null && !userId.isEmpty()) {
             userIntentCache.remove(userId);
             log.info("清除用户 {} 的意图缓存", userId);
+        }
+    }
+
+    public ExaminationIntentData getCachedExaminationIntent(String userId) {
+        if (userId == null || userId.isEmpty()) {
+            return null;
+        }
+        return examinationBookingCache.get(userId);
+    }
+
+    public void updateCachedExaminationIntent(String userId, ExaminationIntentData newData) {
+        if (userId == null || userId.isEmpty()) {
+            return;
+        }
+        
+        ExaminationIntentData existing = examinationBookingCache.get(userId);
+        ExaminationIntentData merged;
+        
+        if (existing == null) {
+            merged = newData;
+        } else {
+            merged = mergeExaminationIntentData(existing, newData);
+        }
+        
+        examinationBookingCache.put(userId, merged);
+        log.info("更新用户 {} 的体检预约缓存: {}", userId, merged);
+    }
+
+    private ExaminationIntentData mergeExaminationIntentData(ExaminationIntentData existing, ExaminationIntentData newData) {
+        ExaminationIntentData merged = new ExaminationIntentData();
+        
+        merged.setIntent(newData.getIntent() != null ? newData.getIntent() : existing.getIntent());
+        merged.setHospitalName(
+            isNotBlank(newData.getHospitalName()) ? newData.getHospitalName() : existing.getHospitalName()
+        );
+        merged.setHospitalCode(
+            isNotBlank(newData.getHospitalCode()) ? newData.getHospitalCode() : existing.getHospitalCode()
+        );
+        merged.setExaminationDate(
+            isNotBlank(newData.getExaminationDate()) ? newData.getExaminationDate() : existing.getExaminationDate()
+        );
+        merged.setExaminationTime(
+            isNotBlank(newData.getExaminationTime()) ? newData.getExaminationTime() : existing.getExaminationTime()
+        );
+        merged.setPackageType(
+            isNotBlank(newData.getPackageType()) ? newData.getPackageType() : existing.getPackageType()
+        );
+        merged.setNotes(
+            isNotBlank(newData.getNotes()) ? newData.getNotes() : existing.getNotes()
+        );
+        merged.setConfidence(newData.getConfidence() != null ? newData.getConfidence() : existing.getConfidence());
+        merged.setNeedsMoreInfo(newData.getNeedsMoreInfo() != null ? newData.getNeedsMoreInfo() : existing.getNeedsMoreInfo());
+        merged.setMissingFields(newData.getMissingFields() != null ? newData.getMissingFields() : existing.getMissingFields());
+        merged.setBookingReady(
+            isNotBlank(merged.getHospitalName()) && isNotBlank(merged.getExaminationDate())
+        );
+        
+        return merged;
+    }
+
+    private boolean isNotBlank(String str) {
+        return str != null && !str.trim().isEmpty();
+    }
+
+    public void clearExaminationBookingCache(String userId) {
+        if (userId != null && !userId.isEmpty()) {
+            examinationBookingCache.remove(userId);
+            log.info("清除用户 {} 的体检预约缓存", userId);
         }
     }
 }

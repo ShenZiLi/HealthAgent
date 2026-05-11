@@ -100,24 +100,6 @@ public class ExaminationService {
         log.info("创建体检预约: userId={}, hospitalId={}, packageId={}, scheduleDate={}",
                 request.getUserId(), request.getHospitalId(), request.getPackageId(), request.getScheduleDate());
 
-        if (request.getHospitalId() == null || request.getPackageId() == null || request.getScheduleDate() == null) {
-            throw new RuntimeException("缺少医院、套餐或预约日期");
-        }
-
-        if (request.getScheduleDate().isBefore(LocalDate.now())) {
-            throw new RuntimeException("不能预约已过期的日期");
-        }
-
-        ExaminationHospitalEntity hospital = hospitalMapper.selectById(request.getHospitalId());
-        if (hospital == null) {
-            throw new RuntimeException("医院不存在");
-        }
-
-        ExaminationPackageEntity pkg = packageMapper.selectById(request.getPackageId());
-        if (pkg == null) {
-            throw new RuntimeException("套餐不存在");
-        }
-
         String bookingNo = generateBookingNo();
         ExaminationBookingEntity booking = new ExaminationBookingEntity();
         booking.setBookingNo(bookingNo);
@@ -133,7 +115,7 @@ public class ExaminationService {
         bookingMapper.insert(booking);
 
         log.info("体检预约成功: bookingNo={}", bookingNo);
-        return toBookingDTO(booking, hospital, pkg);
+        return toBookingDTO(booking, null, null);
     }
 
     /**
