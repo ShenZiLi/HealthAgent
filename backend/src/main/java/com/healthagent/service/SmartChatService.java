@@ -81,13 +81,15 @@ public class SmartChatService {
 
         try {
             log.info("查询用户 {} 的保单信息", userId);
+            // MOCK 保单查询数据
             var policies = policyService.getUserPolicies(userId);
+            // 格式化结构
             String policyInfo = policyService.formatPoliciesAsText(policies);
 
             response.setData(policies);
             response.setAction("query_policy_success");
             response.setMessageType("policy_info");
-
+            // AI友好化处理
             String aiResponse = generatePolicyResponse(userMessage, policyInfo);
             response.setMessage(aiResponse);
 
