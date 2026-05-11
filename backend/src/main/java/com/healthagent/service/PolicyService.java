@@ -229,7 +229,7 @@ public class PolicyService {
             "中华保险"
         ));
 
-        MOCK_POLICIES.put("user001", user1Policies);
+        MOCK_POLICIES.put("admin", user1Policies);
         MOCK_POLICIES.put("user002", user2Policies);
         MOCK_POLICIES.put("user003", user3Policies);
     }

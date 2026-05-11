@@ -20,6 +20,9 @@ public class SmartChatService {
     private PolicyService policyService;
 
     @Autowired
+    private SessionManager sessionManager;
+
+    @Autowired
     private ExaminationIntentService examinationIntentService;
 
     @Autowired
@@ -52,8 +55,14 @@ public class SmartChatService {
 
         log.info("接收到用户消息: {}, userId: {}", userMessage, userId);
 
-        IntentType intent = intentRecognitionService.recognizeIntent(userMessage);
-        log.info("识别到的意图: {}", intent.getDesc());
+        IntentType intent = sessionManager.getCachedIntent(userId);
+        if (intent == null) {
+            intent = intentRecognitionService.recognizeIntent(userMessage);
+            log.info("首次识别意图: {}", intent.getDesc());
+            sessionManager.cacheIntent(userId, intent);
+        } else {
+            log.info("复用缓存意图: {}", intent.getDesc());
+        }
 
         SmartChatResponse response = new SmartChatResponse();
         response.setIntent(intent.getCode());
@@ -143,30 +152,31 @@ public class SmartChatService {
     }
 
     private String buildMockBookingResult(ExaminationIntentData intentData) {
-        String bookingNo = "EXM" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + String.format("%04d", (int)(Math.random() * 10000));
+        String bookingNo = "EXM"
+                + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + String.format("%04d", (int) (Math.random() * 10000));
         return """
-            ✅ 体检预约成功！
+                ✅ 体检预约成功！
 
-            📋 预约信息：
-            • 预约号：%s
-            • 医院：%s
-            • 套餐：%s
-            • 预约日期：%s
-            • 预约时间：%s
+                📋 预约信息：
+                • 预约号：%s
+                • 医院：%s
+                • 套餐：%s
+                • 预约日期：%s
+                • 预约时间：%s
 
-            📌 注意事项：
-            • 体检前一天清淡饮食
-            • 体检当天需空腹
-            • 请携带身份证和预约凭证
+                📌 注意事项：
+                • 体检前一天清淡饮食
+                • 体检当天需空腹
+                • 请携带身份证和预约凭证
 
-            如需变更或取消，请提前联系我们。
-            """.formatted(
+                如需变更或取消，请提前联系我们。
+                """.formatted(
                 bookingNo,
                 intentData.getHospitalName() != null ? intentData.getHospitalName() : "北京协和医院",
                 intentData.getPackageType() != null ? intentData.getPackageType() : "全身体检套餐",
                 intentData.getExaminationDate() != null ? intentData.getExaminationDate() : "待确认",
-                intentData.getExaminationTime() != null ? intentData.getExaminationTime() : "上午 9:00"
-            );
+                intentData.getExaminationTime() != null ? intentData.getExaminationTime() : "上午 9:00");
     }
 
     private String buildMissingInfoMessage(ExaminationIntentData intentData) {
@@ -192,8 +202,7 @@ public class SmartChatService {
             String aiResponse = getChatClient().chat(
                     userMessage,
                     "你是健康助手AI客服，专注于为用户提供健康保险和体检预约相关的咨询和服务。回答要专业、友好、简洁。",
-                    userId
-            );
+                    userId);
             response.setMessage(aiResponse);
             response.setAction("general_response");
             response.setMessageType("conversation");
@@ -210,19 +219,19 @@ public class SmartChatService {
     private String generatePolicyResponse(String userMessage, String policyInfo) {
         try {
             String prompt = String.format("""
-                用户询问保单相关问题，以下是查询到的保单信息：
-                
-                %s
-                
-                请根据以上信息，用友好的方式回复用户，可以：
-                1. 总结保单的主要特点
-                2. 提醒用户关注的事项
-                3. 询问是否需要了解更多信息
-                
-                用户原问题：%s
-                
-                回复要简洁，自然，像一个专业的保险顾问。
-                """, policyInfo, userMessage);
+                    用户询问保单相关问题，以下是查询到的保单信息：
+
+                    %s
+
+                    请根据以上信息，用友好的方式回复用户，可以：
+                    1. 总结保单的主要特点
+                    2. 提醒用户关注的事项
+                    3. 询问是否需要了解更多信息
+
+                    用户原问题：%s
+
+                    回复要简洁，自然，像一个专业的保险顾问。
+                    """, policyInfo, userMessage);
 
             return getChatClient().chat(prompt, "你是一个专业的保险顾问助手。", null);
         } catch (Exception e) {
