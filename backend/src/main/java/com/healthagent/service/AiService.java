@@ -39,7 +39,7 @@ public class AiService {
                     .apiKey(apiKey)
                     .build();
             this.enabled = true;
-            log.info("GLM-4.7-Flash AI服务初始化完成，模型: {}", model);
+            log.info("AI服务初始化完成，模型: {}", model);
         }
     }
 
