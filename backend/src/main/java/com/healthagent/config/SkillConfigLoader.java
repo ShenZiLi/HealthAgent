@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.core.io.ClassPathResource;
+import org.yaml.snakeyaml.Yaml;
 
 import jakarta.annotation.PostConstruct;
 import java.io.BufferedReader;
@@ -23,6 +24,7 @@ import java.util.regex.Pattern;
 public class SkillConfigLoader {
 
     private final Map<String, SkillConfig> skillCache = new ConcurrentHashMap<>();
+    private final Yaml yaml = new Yaml();
 
     @PostConstruct
     public void init() {
@@ -46,7 +48,7 @@ public class SkillConfigLoader {
                 }
                 content = sb.toString();
             }
-            SkillConfig config = parseMarkdownSkill(content, resourcePath);
+            SkillConfig config = parseSkillConfig(content, resourcePath);
             skillCache.put(config.getSkillName(), config);
             log.info("成功加载Skill: {} v{}", config.getSkillName(), config.getVersion());
         } catch (IOException e) {
@@ -54,80 +56,37 @@ public class SkillConfigLoader {
         }
     }
 
-    private SkillConfig parseMarkdownSkill(String markdown, String resourcePath) {
+    @SuppressWarnings("unchecked")
+    private SkillConfig parseSkillConfig(String content, String resourcePath) {
         SkillConfig config = new SkillConfig();
 
         String fileName = resourcePath.substring(resourcePath.lastIndexOf("/") + 1);
         config.setFileName(fileName);
 
-        Pattern namePattern = Pattern.compile("#\\s*Skill:\\s*(.+?)\\n");
-        Matcher nameMatcher = namePattern.matcher(markdown);
-        if (nameMatcher.find()) {
-            config.setSkillName(nameMatcher.group(1).trim());
+        Pattern frontMatterPattern = Pattern.compile("^---\\n([\\s\\S]*?)\\n---", Pattern.MULTILINE);
+        Matcher matcher = frontMatterPattern.matcher(content);
+
+        if (matcher.find()) {
+            String frontMatter = matcher.group(1);
+            Map<String, Object> yamlMap = yaml.load(frontMatter);
+
+            config.setSkillName((String) yamlMap.get("name"));
+            config.setDescription((String) yamlMap.get("description"));
+
+            Object triggerObj = yamlMap.get("trigger");
+            if (triggerObj instanceof List) {
+                config.setTriggers((List<String>) triggerObj);
+            } else if (triggerObj instanceof String) {
+                config.setTriggers(List.of(((String) triggerObj).split("[,，]")));
+            }
+
+            Object versionObj = yamlMap.get("version");
+            config.setVersion(versionObj != null ? versionObj.toString() : "1.0.0");
         }
 
-        Pattern versionPattern = Pattern.compile("-+\\s*\\n.*?版本.*?:\\s*(.+?)\\n", Pattern.DOTALL);
-        Matcher versionMatcher = versionPattern.matcher(markdown);
-        if (versionMatcher.find()) {
-            config.setVersion(versionMatcher.group(1).trim());
-        }
-
-        Pattern descPattern = Pattern.compile("描述.*?:\\s*(.+?)\\n");
-        Matcher descMatcher = descPattern.matcher(markdown);
-        if (descMatcher.find()) {
-            config.setDescription(descMatcher.group(1).trim());
-        }
-
-        Pattern triggerPattern = Pattern.compile("触发词.*?:\\s*(.+?)\\n");
-        Matcher triggerMatcher = triggerPattern.matcher(markdown);
-        if (triggerMatcher.find()) {
-            String triggers = triggerMatcher.group(1).trim();
-            config.setTriggers(parseListItems(triggers));
-        }
-
-        config.setInputSchema(parseMarkdownTable(markdown, "输入参数"));
-        config.setOutputSchema(parseMarkdownTable(markdown, "输出字段说明"));
-        config.setDesensitizationRules(parseMarkdownTable(markdown, "敏感数据脱敏规则"));
-        config.setErrorHandling(parseErrorHandling(markdown));
-        config.setRawContent(markdown);
+        config.setRawContent(content);
 
         return config;
-    }
-
-    private List<String> parseListItems(String line) {
-        List<String> items = new ArrayList<>();
-        String[] parts = line.split("[,，]");
-        for (String part : parts) {
-            String trimmed = part.trim();
-            if (!trimmed.isEmpty()) {
-                items.add(trimmed);
-            }
-        }
-        return items;
-    }
-
-    private String parseMarkdownTable(String markdown, String tableTitle) {
-        Pattern tablePattern = Pattern.compile(
-            tableTitle + "(?:\\s*\\n\\|.*?\\|\\n\\|.*?\\|([\\s\\S]*?))(?=\\n\\w|\\n---|#|$)",
-            Pattern.CASE_INSENSITIVE
-        );
-        Matcher matcher = tablePattern.matcher(markdown);
-        if (matcher.find()) {
-            return matcher.group(0);
-        }
-        return "";
-    }
-
-    private String parseErrorHandling(String markdown) {
-        Pattern errorPattern = Pattern.compile(
-            "## 错误处理\\s*\\n((?:\\|.*?\\|\\n)+)",
-            Pattern.DOTALL
-        );
-        Matcher matcher = errorPattern.matcher(markdown);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return "";
     }
 
     public SkillConfig getSkill(String skillName) {
@@ -162,10 +121,6 @@ public class SkillConfigLoader {
         private String description;
         private String version;
         private List<String> triggers;
-        private String inputSchema;
-        private String outputSchema;
-        private String desensitizationRules;
-        private String errorHandling;
         private String rawContent;
     }
 }
