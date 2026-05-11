@@ -134,12 +134,28 @@ public class SmartChatService {
                 return response;
             }
 
-            log.info("创建体检预约: hospital={}, date={}", intentData.getHospitalName(), intentData.getExaminationDate());
-
-            String mockBookingResult = buildMockBookingResult(intentData);
-            response.setMessage(mockBookingResult);
-            response.setAction("examination_booking_success");
-            response.setMessageType("booking_confirm");
+            // 检查是否有足够的信息进行预约
+            if (hasEnoughBookingInfo(intentData)) {
+                log.info("信息足够，创建体检预约: hospital={}, date={}", 
+                        intentData.getHospitalName(), intentData.getExaminationDate());
+                
+                ExaminationBookingDTO booking = mockBookExamination(userId, intentData);
+                
+                String successMessage = buildBookingSuccessMessage(booking);
+                response.setMessage(successMessage);
+                response.setAction("examination_booking_success");
+                response.setMessageType("booking_confirm");
+                response.setData(booking);
+            } else {
+                log.info("信息不足，需要更多信息: hospital={}, date={}", 
+                        intentData.getHospitalName(), intentData.getExaminationDate());
+                String missingInfo = buildMissingInfoMessage(intentData);
+                response.setMessage(missingInfo);
+                response.setNeedsMoreInfo(true);
+                response.setAction("require_examination_info");
+                response.setMessageType("info_request");
+            }
+            
             return response;
 
         } catch (Exception e) {
@@ -151,10 +167,35 @@ public class SmartChatService {
         }
     }
 
-    private String buildMockBookingResult(ExaminationIntentData intentData) {
-        String bookingNo = "EXM"
-                + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-                + String.format("%04d", (int) (Math.random() * 10000));
+    private boolean hasEnoughBookingInfo(ExaminationIntentData intentData) {
+        return intentData.getHospitalName() != null && !intentData.getHospitalName().trim().isEmpty()
+                && intentData.getExaminationDate() != null && !intentData.getExaminationDate().trim().isEmpty();
+    }
+
+    private ExaminationBookingDTO mockBookExamination(String userId, ExaminationIntentData intentData) {
+        log.info("Mock体检预约: userId={}, hospital={}, date={}", 
+                userId, intentData.getHospitalName(), intentData.getExaminationDate());
+
+        ExaminationBookingRequestDTO request = new ExaminationBookingRequestDTO();
+        request.setUserId(userId);
+        request.setBookerName("张三");
+        request.setBookerPhone("13800138000");
+        request.setIdCardNo("110101199001011234");
+        request.setNotes(intentData.getNotes());
+        
+        try {
+            request.setScheduleDate(java.time.LocalDate.parse(intentData.getExaminationDate()));
+        } catch (Exception e) {
+            request.setScheduleDate(java.time.LocalDate.now().plusDays(1));
+        }
+
+        request.setHospitalId(1L);
+        request.setPackageId(1L);
+
+        return examinationService.bookExamination(request);
+    }
+
+    private String buildBookingSuccessMessage(ExaminationBookingDTO booking) {
         return """
                 ✅ 体检预约成功！
 
@@ -163,7 +204,8 @@ public class SmartChatService {
                 • 医院：%s
                 • 套餐：%s
                 • 预约日期：%s
-                • 预约时间：%s
+                • 预约人：%s
+                • 联系电话：%s
 
                 📌 注意事项：
                 • 体检前一天清淡饮食
@@ -172,11 +214,12 @@ public class SmartChatService {
 
                 如需变更或取消，请提前联系我们。
                 """.formatted(
-                bookingNo,
-                intentData.getHospitalName() != null ? intentData.getHospitalName() : "北京协和医院",
-                intentData.getPackageType() != null ? intentData.getPackageType() : "全身体检套餐",
-                intentData.getExaminationDate() != null ? intentData.getExaminationDate() : "待确认",
-                intentData.getExaminationTime() != null ? intentData.getExaminationTime() : "上午 9:00");
+                booking.getBookingNo(),
+                booking.getHospitalName() != null ? booking.getHospitalName() : "待确认",
+                booking.getPackageName() != null ? booking.getPackageName() : "待确认",
+                booking.getScheduleDate() != null ? booking.getScheduleDate().toString() : "待确认",
+                booking.getBookerName(),
+                booking.getBookerPhone());
     }
 
     private String buildMissingInfoMessage(ExaminationIntentData intentData) {

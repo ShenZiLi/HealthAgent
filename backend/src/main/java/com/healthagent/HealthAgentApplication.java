@@ -10,7 +10,7 @@ public class HealthAgentApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(HealthAgentApplication.class, args);
-        System.out.println("智能健康助手启动成功");
+		System.out.println("HealthAgent Start Success!!!");
 	}
 
 }
