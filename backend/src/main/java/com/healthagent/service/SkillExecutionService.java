@@ -27,14 +27,11 @@ public class SkillExecutionService {
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
-    public JSONObject executePolicyQuery(String userId, String policyNo, String status) {
+    public String executePolicyQuery(String userId, String policyNo, String status) {
         SkillConfigLoader.SkillConfig skillConfig = skillConfigLoader.getSkill("policy_query");
-        JSONObject errorConfig = skillConfig != null ?
-            JSON.parseObject(skillConfig.getErrorHandling()) : null;
 
         if (userId == null || userId.trim().isEmpty()) {
-            return buildErrorResponse("USER_NOT_FOUND",
-                errorConfig != null ? errorConfig.getString("userNotFound") : "用户ID不能为空");
+            return formatAsMarkdown(skillConfig, buildErrorResult("USER_NOT_FOUND", "用户ID不能为空"));
         }
 
         try {
@@ -52,67 +49,62 @@ public class SkillExecutionService {
             }
 
             if (policies.isEmpty()) {
-                return buildErrorResponse("NO_ACTIVE_POLICY",
-                    errorConfig != null ? errorConfig.getString("noActivePolicy") : "未找到保单信息");
+                return formatAsMarkdown(skillConfig, buildErrorResult("NO_ACTIVE_POLICY", "未找到保单信息"));
             }
 
-            return buildSuccessResponse(policies);
+            return formatPoliciesAsMarkdown(skillConfig, policies);
 
         } catch (Exception e) {
             log.error("查询保单失败: {}", e.getMessage(), e);
-            return buildErrorResponse("SYSTEM_ERROR",
-                errorConfig != null ? errorConfig.getString("systemError") : "系统繁忙，请稍后再试");
+            return formatAsMarkdown(skillConfig, buildErrorResult("SYSTEM_ERROR", "系统繁忙，请稍后再试"));
         }
     }
 
-    private JSONObject buildSuccessResponse(List<PolicyInfo> policies) {
-        JSONObject response = new JSONObject();
-        response.put("success", true);
-        response.put("totalCount", policies.size());
+    private Map<String, Object> buildErrorResult(String code, String message) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", false);
+        result.put("code", code);
+        result.put("message", message);
+        return result;
+    }
 
-        JSONArray policyList = new JSONArray();
-        for (PolicyInfo policy : policies) {
-            JSONObject policyJson = maskAndFormatPolicy(policy);
-            policyList.add(policyJson);
+    private String formatAsMarkdown(SkillConfigLoader.SkillConfig skillConfig, Map<String, Object> data) {
+        StringBuilder sb = new StringBuilder();
+        Boolean success = (Boolean) data.get("message");
+        if (success != null && !success) {
+            sb.append("❌ 查询失败\n\n");
         }
-        response.put("policyList", policyList);
-        response.put("message", "查询成功");
-
-        return response;
+        sb.append("**提示信息**: ").append(data.get("message")).append("\n");
+        return sb.toString();
     }
 
-    private JSONObject buildErrorResponse(String code, String message) {
-        JSONObject response = new JSONObject();
-        response.put("success", false);
-        response.put("code", code);
-        response.put("message", message);
-        response.put("policyList", new JSONArray());
-        response.put("totalCount", 0);
-        return response;
-    }
+    private String formatPoliciesAsMarkdown(SkillConfigLoader.SkillConfig skillConfig, List<PolicyInfo> policies) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("✅ 查询成功\n\n");
+        sb.append("您共有 ").append(policies.size()).append(" 份有效保单：\n\n");
 
-    private JSONObject maskAndFormatPolicy(PolicyInfo policy) {
-        JSONObject policyJson = new JSONObject();
+        for (int i = 0; i < policies.size(); i++) {
+            PolicyInfo policy = policies.get(i);
+            sb.append("**【保单").append(i + 1).append("】**\n");
 
-        policyJson.put("policyId", dataMaskingService.maskPolicyId(policy.getPolicyId()));
+            sb.append("- **保单号**: ").append(dataMaskingService.maskPolicyId(policy.getPolicyId())).append("\n");
+            sb.append("- **产品名称**: ").append(policy.getPolicyName()).append("\n");
+            sb.append("- **保险公司**: ").append(policy.getInsuranceCompany()).append("\n");
+            sb.append("- **保障额度**: ").append(formatAmount(policy.getCoverage())).append("元\n");
+            sb.append("- **年缴保费**: ").append(formatAmount(policy.getPremium())).append("元\n");
+            sb.append("- **生效日期**: ").append(formatDate(policy.getStartDate())).append("\n");
 
-        policyJson.put("policyName", policy.getPolicyName());
+            if (policy.getEndDate() != null) {
+                sb.append("- **到期日期**: ").append(formatDate(policy.getEndDate())).append("\n");
+            } else {
+                sb.append("- **保障期限**: 终身\n");
+            }
 
-        String statusText = "unknown".equals(policy.getStatus()) ? "未知" :
-                           "active".equals(policy.getStatus()) ? "生效中" :
-                           "expired".equals(policy.getStatus()) ? "已过期" :
-                           "pending".equals(policy.getStatus()) ? "待生效" : policy.getStatus();
-        policyJson.put("status", statusText);
+            sb.append("- **状态**: ").append(formatStatus(policy.getStatus())).append("\n");
+            sb.append("\n");
+        }
 
-        policyJson.put("coverage", formatAmount(policy.getCoverage()));
-        policyJson.put("premium", formatAmount(policy.getPremium()));
-
-        policyJson.put("effectiveDate", formatDate(policy.getStartDate()));
-        policyJson.put("expiryDate", formatDate(policy.getEndDate()));
-
-        policyJson.put("insuranceCompany", policy.getInsuranceCompany());
-
-        return policyJson;
+        return sb.toString();
     }
 
     private String formatAmount(java.math.BigDecimal amount) {
@@ -127,6 +119,19 @@ public class SkillExecutionService {
             return "终身";
         }
         return DATE_FORMAT.format(date);
+    }
+
+    private String formatStatus(String status) {
+        if (status == null) {
+            return "未知";
+        }
+        return switch (status.toLowerCase()) {
+            case "active" -> "生效中";
+            case "expired" -> "已过期";
+            case "pending" -> "待生效";
+            case "cancelled" -> "已取消";
+            default -> status;
+        };
     }
 
     public boolean isPolicyQuerySkill(String message) {
@@ -147,5 +152,9 @@ public class SkillExecutionService {
             }
         }
         return false;
+    }
+
+    public SkillConfigLoader.SkillConfig matchSkillByTrigger(String message) {
+        return skillConfigLoader.getSkillByTrigger(message);
     }
 }
