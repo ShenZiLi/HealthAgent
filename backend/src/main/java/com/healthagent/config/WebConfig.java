@@ -19,26 +19,16 @@ public class WebConfig implements WebMvcConfigurer {
     @Autowired
     private AuthInterceptor authInterceptor;
 
-    @Value("${healthagent.cors.allowed-origin-patterns:http://localhost:*,http://127.0.0.1:*}")
-    private String allowedOriginPatterns;
-
     @Value("${healthagent.auth.interceptor-enabled:true}")
     private boolean authInterceptorEnabled;
     
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("http://localhost:5173",
-                        "http://127.0.0.1:5173",
-                        "http://localhost:5174",
-                        "http://127.0.0.1:5174")
-                .allowedOriginPatterns(Arrays.stream(allowedOriginPatterns.split(","))
-                        .map(String::trim)
-                        .filter(pattern -> !pattern.isEmpty())
-                        .toArray(String[]::new))
+                .allowedOriginPatterns("*")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
-                .allowCredentials(true)
+                .allowCredentials(false)
                 .maxAge(3600);
     }
     

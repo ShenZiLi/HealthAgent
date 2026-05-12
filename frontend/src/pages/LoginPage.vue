@@ -71,7 +71,7 @@
         </form>
 
         <div class="mt-6 text-center text-sm text-slate-500">
-          <p>账户: admin / 密码：admin123</p>
+          <p>账户: admin/密码：admin123</p>
         </div>
       </div>
     </div>
