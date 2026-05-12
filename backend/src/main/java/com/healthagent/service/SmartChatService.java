@@ -9,9 +9,27 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.Set;
+import java.util.regex.Pattern;
+
 @Slf4j
 @Service
 public class SmartChatService {
+
+    private static final Set<String> POLICY_KEYWORDS = Set.of(
+            "保单", "保险", "理赔", "投保", "承保", "保费", "险种", "保障",
+            "policy", "insurance", "claim", "coverage"
+    );
+
+    private static final Set<String> EXAMINATION_KEYWORDS = Set.of(
+            "体检", "预约", "检查", "医院", "挂号", "门诊", "住院",
+            "examination", "checkup", "hospital", "appointment"
+    );
+
+    private static final Pattern KEYWORD_PATTERN = Pattern.compile(
+            "(保单|保险|理赔|体检|预约|医院|检查|投保|承保|保费|险种|保障)",
+            Pattern.CASE_INSENSITIVE
+    );
 
     @Autowired
     private IntentRecognitionService intentRecognitionService;
@@ -55,19 +73,27 @@ public class SmartChatService {
 
         log.info("接收到用户消息: {}, userId: {}", userMessage, userId);
 
-        IntentType intent = sessionManager.getCachedIntent(userId);
-        if (intent == null) {
-            intent = intentRecognitionService.recognizeIntent(userMessage);
-            log.info("首次识别意图: {}", intent.getDesc());
-            sessionManager.cacheIntent(userId, intent);
+        IntentType cachedIntent = sessionManager.getCachedIntent(userId);
+        IntentType currentIntent;
+
+        if (shouldRefreshIntent(userMessage, cachedIntent)) {
+            log.info("检测到关键词触发意图刷新");
+            currentIntent = intentRecognitionService.recognizeIntent(userMessage);
+            sessionManager.cacheIntent(userId, currentIntent);
+            log.info("刷新后的新意图: {}", currentIntent.getDesc());
+        } else if (cachedIntent == null) {
+            currentIntent = intentRecognitionService.recognizeIntent(userMessage);
+            log.info("首次识别意图: {}", currentIntent.getDesc());
+            sessionManager.cacheIntent(userId, currentIntent);
         } else {
-            log.info("复用缓存意图: {}", intent.getDesc());
+            currentIntent = cachedIntent;
+            log.info("复用缓存意图: {}", currentIntent.getDesc());
         }
 
         SmartChatResponse response = new SmartChatResponse();
-        response.setIntent(intent.getCode());
+        response.setIntent(currentIntent.getCode());
 
-        switch (intent) {
+        switch (currentIntent) {
             case QUERY_POLICY:
                 return handleInsuranceQuery(userMessage, userId, response);
             case BOOK_EXAMINATION:
@@ -77,6 +103,14 @@ public class SmartChatService {
             default:
                 return handleGeneralConversation(userMessage, userId, response);
         }
+    }
+
+    private boolean shouldRefreshIntent(String userMessage, IntentType cachedIntent) {
+        if (userMessage == null || userMessage.trim().isEmpty() || cachedIntent == null) {
+            return false;
+        }
+
+        return KEYWORD_PATTERN.matcher(userMessage).find();
     }
 
     private SmartChatResponse handleInsuranceQuery(String userMessage, String userId, SmartChatResponse response) {
