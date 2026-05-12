@@ -49,7 +49,10 @@ public class ExaminationIntentService {
             String prompt = buildExaminationIntentPrompt(userMessage);
             String jsonResponse = callGLMForIntent(prompt);
             
-            JSONObject intentData = JSON.parseObject(jsonResponse);
+            // 清理AI返回的内容，移除markdown代码块标记
+            String cleanedJson = cleanJsonContent(jsonResponse);
+            
+            JSONObject intentData = JSON.parseObject(cleanedJson);
             
             String hospitalName = intentData.getString("hospitalName");
             String hospitalCode = intentData.getString("hospitalCode");
@@ -86,6 +89,31 @@ public class ExaminationIntentService {
             log.error("体检意图识别失败，尝试规则匹配", e);
             return fallbackRuleBasedRecognition(userMessage);
         }
+    }
+
+    private String cleanJsonContent(String content) {
+        if (content == null || content.isEmpty()) {
+            return content;
+        }
+        
+        // 移除markdown代码块标记
+        String cleaned = content.trim();
+        
+        // 处理 ```json ... ``` 格式
+        if (cleaned.startsWith("```")) {
+            int firstNewLine = cleaned.indexOf('\n');
+            if (firstNewLine != -1) {
+                cleaned = cleaned.substring(firstNewLine + 1);
+            } else {
+                cleaned = cleaned.substring(3);
+            }
+        }
+        
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+        
+        return cleaned.trim();
     }
 
     private String buildExaminationIntentPrompt(String userMessage) {

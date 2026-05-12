@@ -28,4 +28,6 @@ public class ExaminationIntentData {
     private Boolean needsMoreInfo;
     
     private String missingFields;
+    
+    private boolean isBookingReady;
 }

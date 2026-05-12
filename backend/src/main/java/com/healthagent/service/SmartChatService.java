@@ -9,15 +9,36 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.Set;
+import java.util.regex.Pattern;
+
 @Slf4j
 @Service
 public class SmartChatService {
+
+    private static final Set<String> POLICY_KEYWORDS = Set.of(
+            "保单", "保险", "理赔", "投保", "承保", "保费", "险种", "保障",
+            "policy", "insurance", "claim", "coverage"
+    );
+
+    private static final Set<String> EXAMINATION_KEYWORDS = Set.of(
+            "体检", "预约", "检查", "医院", "挂号", "门诊", "住院",
+            "examination", "checkup", "hospital", "appointment"
+    );
+
+    private static final Pattern KEYWORD_PATTERN = Pattern.compile(
+            "(保单|保险|理赔|体检|预约|医院|检查|投保|承保|保费|险种|保障)",
+            Pattern.CASE_INSENSITIVE
+    );
 
     @Autowired
     private IntentRecognitionService intentRecognitionService;
 
     @Autowired
     private PolicyService policyService;
+
+    @Autowired
+    private SessionManager sessionManager;
 
     @Autowired
     private ExaminationIntentService examinationIntentService;
@@ -52,13 +73,27 @@ public class SmartChatService {
 
         log.info("接收到用户消息: {}, userId: {}", userMessage, userId);
 
-        IntentType intent = intentRecognitionService.recognizeIntent(userMessage);
-        log.info("识别到的意图: {}", intent.getDesc());
+        IntentType cachedIntent = sessionManager.getCachedIntent(userId);
+        IntentType currentIntent;
+
+        if (shouldRefreshIntent(userMessage, cachedIntent)) {
+            log.info("检测到关键词触发意图刷新");
+            currentIntent = intentRecognitionService.recognizeIntent(userMessage);
+            sessionManager.cacheIntent(userId, currentIntent);
+            log.info("刷新后的新意图: {}", currentIntent.getDesc());
+        } else if (cachedIntent == null) {
+            currentIntent = intentRecognitionService.recognizeIntent(userMessage);
+            log.info("首次识别意图: {}", currentIntent.getDesc());
+            sessionManager.cacheIntent(userId, currentIntent);
+        } else {
+            currentIntent = cachedIntent;
+            log.info("复用缓存意图: {}", currentIntent.getDesc());
+        }
 
         SmartChatResponse response = new SmartChatResponse();
-        response.setIntent(intent.getCode());
+        response.setIntent(currentIntent.getCode());
 
-        switch (intent) {
+        switch (currentIntent) {
             case QUERY_POLICY:
                 return handleInsuranceQuery(userMessage, userId, response);
             case BOOK_EXAMINATION:
@@ -68,6 +103,14 @@ public class SmartChatService {
             default:
                 return handleGeneralConversation(userMessage, userId, response);
         }
+    }
+
+    private boolean shouldRefreshIntent(String userMessage, IntentType cachedIntent) {
+        if (userMessage == null || userMessage.trim().isEmpty() || cachedIntent == null) {
+            return false;
+        }
+
+        return KEYWORD_PATTERN.matcher(userMessage).find();
     }
 
     private SmartChatResponse handleInsuranceQuery(String userMessage, String userId, SmartChatResponse response) {
@@ -81,13 +124,15 @@ public class SmartChatService {
 
         try {
             log.info("查询用户 {} 的保单信息", userId);
+            // MOCK 保单查询数据
             var policies = policyService.getUserPolicies(userId);
+            // 格式化结构
             String policyInfo = policyService.formatPoliciesAsText(policies);
 
             response.setData(policies);
             response.setAction("query_policy_success");
             response.setMessageType("policy_info");
-
+            // AI友好化处理
             String aiResponse = generatePolicyResponse(userMessage, policyInfo);
             response.setMessage(aiResponse);
 
@@ -114,25 +159,32 @@ public class SmartChatService {
             log.info("识别体检预约意图");
             ExaminationIntentData intentData = examinationIntentService.recognizeExaminationIntent(userMessage);
 
-            if (intentData.getNeedsMoreInfo() != null && intentData.getNeedsMoreInfo()) {
-                String missingInfo = buildMissingInfoMessage(intentData);
+            sessionManager.updateCachedExaminationIntent(userId, intentData);
+
+            ExaminationIntentData cachedIntent = sessionManager.getCachedExaminationIntent(userId);
+
+            if (cachedIntent.isBookingReady()) {
+                log.info("信息收集完成，创建体检预约: hospital={}, date={}",
+                        cachedIntent.getHospitalName(), cachedIntent.getExaminationDate());
+
+                ExaminationBookingDTO booking = mockBookExamination(userId, cachedIntent);
+
+                String successMessage = buildBookingSuccessMessage(booking);
+                response.setMessage(successMessage);
+                response.setAction("examination_booking_success");
+                response.setMessageType("booking_confirm");
+                response.setData(booking);
+
+                sessionManager.clearExaminationBookingCache(userId);
+            } else {
+                String missingInfo = buildMissingInfoMessage(cachedIntent);
                 response.setMessage(missingInfo);
                 response.setNeedsMoreInfo(true);
                 response.setAction("require_examination_info");
                 response.setMessageType("info_request");
-                return response;
+
+                log.info("需要更多信息，缺失字段: {}", cachedIntent.getMissingFields());
             }
-
-            log.info("创建体检预约: hospital={}, date={}", intentData.getHospitalName(), intentData.getExaminationDate());
-
-            ExaminationBookingRequest bookingRequest = new ExaminationBookingRequest();
-            bookingRequest.setUserId(userId);
-            bookingRequest.setHospitalName(intentData.getHospitalName());
-            bookingRequest.setHospitalCode(intentData.getHospitalCode());
-            bookingRequest.setExaminationDate(intentData.getExaminationDate());
-            bookingRequest.setExaminationTime(intentData.getExaminationTime());
-            bookingRequest.setPackageName(intentData.getPackageType());
-            bookingRequest.setNotes(intentData.getNotes());
 
             return response;
 
@@ -143,6 +195,54 @@ public class SmartChatService {
             response.setMessageType("error");
             return response;
         }
+    }
+
+    private ExaminationBookingDTO mockBookExamination(String userId, ExaminationIntentData intentData) {
+        log.info("Mock体检预约: userId={}, hospital={}, date={}",
+                userId, intentData.getHospitalName(), intentData.getExaminationDate());
+
+        ExaminationBookingRequestDTO request = new ExaminationBookingRequestDTO();
+        request.setUserId(userId);
+        request.setBookerName("张三");
+        request.setBookerPhone("13800138000");
+        request.setIdCardNo("110101199001011234");
+        request.setNotes(intentData.getNotes());
+
+        request.setScheduleDate(java.time.LocalDate.parse(intentData.getExaminationDate()));
+
+        request.setHospitalId(1L);
+        request.setPackageId(1L);
+        ExaminationBookingDTO booking = examinationService.bookExamination(request);
+        booking.setHospitalName(intentData.getHospitalName());
+        booking.setScheduleDate(java.time.LocalDate.parse(intentData.getExaminationDate()));
+        return booking;
+    }
+
+    private String buildBookingSuccessMessage(ExaminationBookingDTO booking) {
+        return """
+                ✅ 体检预约成功！
+
+                📋 预约信息：
+                • 预约号：%s
+                • 医院：%s
+                • 套餐：%s
+                • 预约日期：%s
+                • 预约人：%s
+                • 联系电话：%s
+
+                📌 注意事项：
+                • 体检前一天清淡饮食
+                • 体检当天需空腹
+                • 请携带身份证和预约凭证
+
+                如需变更或取消，请提前联系我们。
+                """.formatted(
+                booking.getBookingNo(),
+                booking.getHospitalName() != null ? booking.getHospitalName() : "待确认",
+                booking.getPackageName() != null ? booking.getPackageName() : "待确认",
+                booking.getScheduleDate() != null ? booking.getScheduleDate().toString() : "待确认",
+                booking.getBookerName(),
+                booking.getBookerPhone());
     }
 
     private String buildMissingInfoMessage(ExaminationIntentData intentData) {
@@ -168,8 +268,7 @@ public class SmartChatService {
             String aiResponse = getChatClient().chat(
                     userMessage,
                     "你是健康助手AI客服，专注于为用户提供健康保险和体检预约相关的咨询和服务。回答要专业、友好、简洁。",
-                    userId
-            );
+                    userId);
             response.setMessage(aiResponse);
             response.setAction("general_response");
             response.setMessageType("conversation");
@@ -186,19 +285,19 @@ public class SmartChatService {
     private String generatePolicyResponse(String userMessage, String policyInfo) {
         try {
             String prompt = String.format("""
-                用户询问保单相关问题，以下是查询到的保单信息：
-                
-                %s
-                
-                请根据以上信息，用友好的方式回复用户，可以：
-                1. 总结保单的主要特点
-                2. 提醒用户关注的事项
-                3. 询问是否需要了解更多信息
-                
-                用户原问题：%s
-                
-                回复要简洁，自然，像一个专业的保险顾问。
-                """, policyInfo, userMessage);
+                    用户询问保单相关问题，以下是查询到的保单信息：
+
+                    %s
+
+                    请根据以上信息，用友好的方式回复用户，可以：
+                    1. 总结保单的主要特点
+                    2. 提醒用户关注的事项
+                    3. 询问是否需要了解更多信息
+
+                    用户原问题：%s
+
+                    回复要简洁，自然，像一个专业的保险顾问。
+                    """, policyInfo, userMessage);
 
             return getChatClient().chat(prompt, "你是一个专业的保险顾问助手。", null);
         } catch (Exception e) {

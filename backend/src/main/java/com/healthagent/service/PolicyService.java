@@ -2,8 +2,8 @@ package com.healthagent.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.healthagent.dto.PolicyQueryRequest;
 import com.healthagent.dto.PolicyInfo;
+import com.healthagent.dto.PolicyQueryRequest;
 import com.healthagent.entity.PolInfoEntity;
 import com.healthagent.mapper.PolInfoMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -12,9 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 保单查询服务
@@ -231,7 +229,7 @@ public class PolicyService {
             "中华保险"
         ));
 
-        MOCK_POLICIES.put("user001", user1Policies);
+        MOCK_POLICIES.put("admin", user1Policies);
         MOCK_POLICIES.put("user002", user2Policies);
         MOCK_POLICIES.put("user003", user3Policies);
     }
@@ -241,12 +239,6 @@ public class PolicyService {
      */
     public List<PolicyInfo> getUserPolicies(String userId) {
         log.info("查询用户 {} 的保单信息", userId);
-        
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
         
         List<PolicyInfo> policies = MOCK_POLICIES.get(userId);
         if (policies == null) {
