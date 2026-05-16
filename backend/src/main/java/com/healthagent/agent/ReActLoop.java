@@ -49,12 +49,15 @@ public class ReActLoop {
         - 只输出要求的格式，不要有额外解释
         - Action Input 必须是 valid JSON
         - 工具调用只调用一次，不要嵌套或循环调用
+        - 调用工具时，必须包含 userId 参数（即当前用户的ID）
         """;
 
     private static final Pattern THOUGHT_PATTERN = Pattern.compile("Thought:\\s*(.*?)(?=\\s*(Action|Finish|$))", Pattern.DOTALL);
     private static final Pattern ACTION_PATTERN = Pattern.compile("Action:\\s*(\\w+)");
     private static final Pattern ACTION_INPUT_PATTERN = Pattern.compile("Action Input:\\s*(\\{.*?\\})", Pattern.DOTALL);
     private static final Pattern FINISH_PATTERN = Pattern.compile("Finish:\\s*(.*)", Pattern.DOTALL);
+
+    private String currentUserId;
 
     public ReActLoop(ToolRegistry toolRegistry, ToolExecutor toolExecutor, AbstractChatClient chatClient) {
         this.toolRegistry = toolRegistry;
@@ -65,6 +68,7 @@ public class ReActLoop {
     public ReActResult run(ConversationState state, UserInput input) {
         ReActResult result = new ReActResult();
         List<ReActStep> steps = new ArrayList<>();
+        this.currentUserId = input.getUserId();
 
         for (int step = 0; step < MAX_STEPS; step++) {
             log.info("ReAct step {}/{}", step + 1, MAX_STEPS);
@@ -180,8 +184,12 @@ public class ReActLoop {
     }
 
     private Observation executeAction(Action action) {
-        log.info("Executing action: {} with params: {}", action.getToolName(), action.getParameters());
-        ToolResult result = toolExecutor.execute(action.getToolName(), action.getParameters());
+        Map<String, Object> params = new HashMap<>(action.getParameters());
+        if (currentUserId != null && !params.containsKey("userId")) {
+            params.put("userId", currentUserId);
+        }
+        log.info("Executing action: {} with params: {}", action.getToolName(), params);
+        ToolResult result = toolExecutor.execute(action.getToolName(), params);
 
         String content;
         if (result.isSuccess()) {
