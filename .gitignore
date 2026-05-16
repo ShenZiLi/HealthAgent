@@ -38,4 +38,4 @@ Thumbs.db
 # 临时文件
 *.tmp
 *.temp
-UsersShen.git-credentials
+*.git-credentials
