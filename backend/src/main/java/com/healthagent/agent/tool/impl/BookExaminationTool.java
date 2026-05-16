@@ -32,7 +32,11 @@ public class BookExaminationTool implements Tool {
 
     @Override
     public String getDescription() {
-        return "创建体检预约。可以使用 hospitalName（医院名称）和 packageName（套餐名称）来预约，系统会自动匹配对应的ID。";
+        return "创建体检预约。必填参数：userId、date(YYYY-MM-DD)、name(预约人姓名)、phone(联系电话)。" +
+               "使用 hospitalName（如'北京协和医院'）或 hospitalId 指定医院；" +
+               "使用 packageName（如'入职体检套餐'）或 packageId 指定套餐。" +
+               "可用套餐：入职体检套餐、基础体检套餐、全身体检套餐、老年体检套餐、女性专项体检套餐。" +
+               "如果用户未提供姓名或电话，请向用户追问，不要使用默认值。";
     }
 
     @Override
@@ -116,12 +120,29 @@ public class BookExaminationTool implements Tool {
 
             Long hospitalId = resolveHospitalId(input.getParameters());
             if (hospitalId == null) {
-                return ToolResult.error("预约失败：未找到匹配的医院，请提供正确的医院名称或医院ID。可使用 list_hospitals 工具查询可用医院。");
+                List<ExaminationHospitalDTO> hospitals = examinationService.getAvailableHospitals();
+                StringBuilder sb = new StringBuilder("预约失败：未找到匹配的医院。");
+                sb.append("\n请向用户询问选择以下可用医院之一：");
+                for (ExaminationHospitalDTO h : hospitals) {
+                    sb.append("\n- ").append(h.getHospitalName()).append(" (地址：").append(h.getAddress()).append(")");
+                }
+                sb.append("\n\n请使用 hospitalName 参数指定医院名称，或告知用户从中选择一家医院。");
+                return ToolResult.error(sb.toString());
             }
 
             Long packageId = resolvePackageId(input.getParameters());
             if (packageId == null) {
-                return ToolResult.error("预约失败：未找到匹配的套餐，请提供正确的套餐名称或套餐ID。可使用 list_packages 工具查询可用套餐。");
+                List<ExaminationPackageDTO> packages = examinationService.getAvailablePackages();
+                StringBuilder sb = new StringBuilder("预约失败：未找到匹配的套餐。");
+                sb.append("\n请向用户询问选择以下可用套餐之一：");
+                for (ExaminationPackageDTO pkg : packages) {
+                    sb.append("\n- ").append(pkg.getPackageName()).append(" ¥").append(pkg.getPrice());
+                    if (pkg.getPackageDesc() != null) {
+                        sb.append(" - ").append(pkg.getPackageDesc());
+                    }
+                }
+                sb.append("\n\n请使用 packageName 参数指定套餐名称（必须使用上方列表中的准确名称），或告知用户从中选择一个套餐。");
+                return ToolResult.error(sb.toString());
             }
 
             ExaminationBookingRequestDTO request = new ExaminationBookingRequestDTO();
@@ -166,6 +187,13 @@ public class BookExaminationTool implements Tool {
         if (hospitalName != null && !hospitalName.isBlank()) {
             List<ExaminationHospitalDTO> hospitals = examinationService.searchHospitals(hospitalName);
             if (!hospitals.isEmpty()) {
+                String searchName = hospitalName.toLowerCase().trim();
+                for (ExaminationHospitalDTO hospital : hospitals) {
+                    String dbName = hospital.getHospitalName().toLowerCase();
+                    if (dbName.equals(searchName) || dbName.contains(searchName)) {
+                        return hospital.getId();
+                    }
+                }
                 return hospitals.get(0).getId();
             }
         }
@@ -183,13 +211,34 @@ public class BookExaminationTool implements Tool {
         if (packageName == null || packageName.isBlank()) {
             packageName = (String) params.get("package");
         }
-        if (packageName != null && !packageName.isBlank()) {
-            List<ExaminationPackageDTO> packages = examinationService.getAvailablePackages();
-            for (ExaminationPackageDTO pkg : packages) {
-                if (pkg.getPackageName().contains(packageName)) {
-                    return pkg.getId();
-                }
+        if (packageName == null || packageName.isBlank()) {
+            return null;
+        }
+
+        List<ExaminationPackageDTO> packages = examinationService.getAvailablePackages();
+
+        for (ExaminationPackageDTO pkg : packages) {
+            if (pkg.getPackageName().contains(packageName)) {
+                return pkg.getId();
             }
+        }
+
+        for (ExaminationPackageDTO pkg : packages) {
+            String pkgName = pkg.getPackageName().toLowerCase();
+            String searchName = packageName.toLowerCase();
+            if (pkgName.contains("入职") && searchName.contains("入职")) return pkg.getId();
+            if (pkgName.contains("基础") && searchName.contains("基础")) return pkg.getId();
+            if (pkgName.contains("全身") && searchName.contains("全身")) return pkg.getId();
+            if (pkgName.contains("老年") && searchName.contains("老年")) return pkg.getId();
+            if (pkgName.contains("女性") && searchName.contains("女性")) return pkg.getId();
+            if (pkgName.contains("标准") && searchName.contains("标准")) return pkg.getId();
+            if (pkgName.contains("全面") && searchName.contains("全面")) return pkg.getId();
+            if (pkgName.contains("全身体检") && (searchName.contains("全身") || searchName.contains("全面") || searchName.contains("全项"))) return pkg.getId();
+            if (pkgName.contains("基础体检") && (searchName.contains("基础") || searchName.contains("普通") || searchName.contains("标准"))) return pkg.getId();
+        }
+
+        if (!packages.isEmpty()) {
+            return packages.get(0).getId();
         }
 
         return null;
