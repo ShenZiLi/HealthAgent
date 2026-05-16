@@ -44,10 +44,10 @@ public class ListPackagesTool implements Tool {
             StringBuilder sb = new StringBuilder();
             sb.append("可用套餐列表：\n\n");
             for (ExaminationPackageDTO pkg : packages) {
-                sb.append("- ").append(pkg.getName());
+                sb.append("- ").append(pkg.getPackageName());
                 sb.append(" ¥").append(pkg.getPrice());
-                if (pkg.getDescription() != null) {
-                    sb.append(" - ").append(pkg.getDescription());
+                if (pkg.getPackageDesc() != null) {
+                    sb.append(" - ").append(pkg.getPackageDesc());
                 }
                 sb.append(" [ID: ").append(pkg.getId()).append("]");
                 sb.append("\n");

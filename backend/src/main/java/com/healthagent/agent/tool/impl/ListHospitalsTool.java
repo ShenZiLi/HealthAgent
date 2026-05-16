@@ -44,9 +44,9 @@ public class ListHospitalsTool implements Tool {
             StringBuilder sb = new StringBuilder();
             sb.append("可用医院列表：\n\n");
             for (ExaminationHospitalDTO hospital : hospitals) {
-                sb.append("- ").append(hospital.getName());
-                if (hospital.getLevel() != null) {
-                    sb.append(" (").append(hospital.getLevel()).append(")");
+                sb.append("- ").append(hospital.getHospitalName());
+                if (hospital.getHospitalLevel() != null) {
+                    sb.append(" (").append(hospital.getHospitalLevel()).append(")");
                 }
                 sb.append(" [ID: ").append(hospital.getId()).append("]");
                 sb.append("\n");
