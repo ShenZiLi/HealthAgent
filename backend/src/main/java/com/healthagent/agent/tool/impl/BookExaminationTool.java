@@ -107,12 +107,12 @@ public class BookExaminationTool implements Tool {
             if (dateStr == null || dateStr.isBlank()) {
                 return ToolResult.error("预约失败：缺少预约日期参数");
             }
-            if (bookerName == null || bookerName.isBlank()) {
-                return ToolResult.error("预约失败：缺少预约人姓名参数");
-            }
-            if (bookerPhone == null || bookerPhone.isBlank()) {
-                return ToolResult.error("预约失败：缺少联系电话参数");
-            }
+            //if (bookerName == null || bookerName.isBlank()) {
+            //    return ToolResult.error("预约失败：缺少预约人姓名参数");
+            //}
+            //if (bookerPhone == null || bookerPhone.isBlank()) {
+            //    return ToolResult.error("预约失败：缺少联系电话参数");
+            //}
 
             Long hospitalId = resolveHospitalId(input.getParameters());
             if (hospitalId == null) {
