@@ -28,6 +28,12 @@ export default defineConfig({
     },
   },
   server: {
+    cors: {
+      origin: '*',
+      methods: '*',
+      allowedHeaders: '*',
+      credentials: true,
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8084',
