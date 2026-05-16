@@ -87,4 +87,4 @@ healthagent:
     model: glm-4.6v
 #    glm-4.6v 高速, glm-4.7-flash 免费
   glm:
-    api-key: 3ec488cb4e07423891b08990accb1258.z2vVKbQPgcFTf5Br
+    api-key: ${GLM_API_KEY:}
