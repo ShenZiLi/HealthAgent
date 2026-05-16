@@ -89,6 +89,18 @@ public class PolicyController {
         }
     }
 
+    @Operation(summary = "根据用户ID查询")
+    @GetMapping("/user/{userId}")
+    public Result<List<PolInfoEntity>> getByUserId(@PathVariable String userId) {
+        try {
+            List<PolInfoEntity> policies = policyService.getByUserId(userId);
+            return Result.success(policies);
+        } catch (Exception e) {
+            log.error("查询保单失败", e);
+            return Result.error("查询保单失败: " + e.getMessage());
+        }
+    }
+
     @Operation(summary = "查询所有保单")
     @GetMapping("/all")
     public Result<List<PolInfoEntity>> getAllPolicies() {

@@ -255,6 +255,9 @@ public class ExaminationService {
         ExaminationBookingDTO dto = new ExaminationBookingDTO();
         dto.setId(booking.getId());
         dto.setBookingNo(booking.getBookingNo());
+        dto.setHospitalId(booking.getHospitalId());
+        dto.setPackageId(booking.getPackageId());
+        dto.setScheduleDate(booking.getScheduleDate());
         dto.setUserId(booking.getUserId());
         dto.setBookerName(booking.getBookerName());
         dto.setBookerPhone(booking.getBookerPhone());
@@ -262,6 +265,18 @@ public class ExaminationService {
         dto.setNotes(booking.getNotes());
         dto.setStatus(booking.getStatus());
         dto.setCreateTime(booking.getCreateTime());
+
+        if (hospital != null) {
+            dto.setHospitalName(hospital.getHospitalName());
+            dto.setHospitalLevel(hospital.getHospitalLevel());
+            dto.setHospitalAddress(hospital.getAddress());
+            dto.setHospitalPhone(hospital.getPhone());
+        }
+        if (pkg != null) {
+            dto.setPackageName(pkg.getPackageName());
+            dto.setPackageDesc(pkg.getPackageDesc());
+            dto.setPrice(pkg.getPrice());
+        }
         return dto;
     }
 

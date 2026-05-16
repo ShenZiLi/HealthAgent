@@ -34,6 +34,10 @@ export default defineConfig({
       allowedHeaders: '*',
       credentials: true,
     },
+    host: '0.0.0.0', // ⚠️ 必须！否则 cpolar 连不上本地服务
+    port: 5173,      // 你的 Vite 端口（默认 5173）
+    strictPort: false,
+    allowedHosts: ['all', '2094ae92.r21.cpolar.top', 'r21.cpolar.top'],
     proxy: {
       '/api': {
         target: 'http://localhost:8084',

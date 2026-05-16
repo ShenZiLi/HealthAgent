@@ -1,6 +1,7 @@
 package com.healthagent.service;
 
 import ai.z.openapi.service.model.ChatMessage;
+import com.healthagent.agent.ConversationState;
 import com.healthagent.common.IntentType;
 import com.healthagent.dto.ExaminationIntentData;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ public class SessionManager {
     private final Map<String, List<ChatMessage>> sessionHistory = new ConcurrentHashMap<>();
     private final Map<String, IntentType> userIntentCache = new ConcurrentHashMap<>();
     private final Map<String, ExaminationIntentData> examinationBookingCache = new ConcurrentHashMap<>();
+    private final Map<String, ConversationState> conversationStateCache = new ConcurrentHashMap<>();
 
     public String createSession() {
         String sessionId = UUID.randomUUID().toString();
@@ -148,6 +150,22 @@ public class SessionManager {
         if (userId != null && !userId.isEmpty()) {
             examinationBookingCache.remove(userId);
             log.info("清除用户 {} 的体检预约缓存", userId);
+        }
+    }
+
+    public ConversationState getOrCreateConversationState(String userId) {
+        return conversationStateCache.computeIfAbsent(userId, k -> new ConversationState());
+    }
+
+    public void saveConversationState(String userId, ConversationState state) {
+        conversationStateCache.put(userId, state);
+        log.info("保存用户 {} 的会话状态", userId);
+    }
+
+    public void clearConversationState(String userId) {
+        if (userId != null && !userId.isEmpty()) {
+            conversationStateCache.remove(userId);
+            log.info("清除用户 {} 的会话状态", userId);
         }
     }
 }

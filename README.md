@@ -1,7 +1,7 @@
 # HealthAgent 智慧健康助手 — 详细设计文档
 
-> **版本**: v2.0\
-> **日期**: 2026-05-12\
+> **版本**: v3.0\
+> **日期**: 2026-05-16\
 > **项目路径**: C:\Project\Code\HealthAgent
 
 ***
@@ -32,9 +32,10 @@ HealthAgent 是一款智慧健康助手应用，旨在为用户提供便捷的�
 
 | 功能模块 | 描述                         |
 | ---- | -------------------------- |
-| 智能对话 | 基于意图识别的 AI 对话，支持自然语言交互     |
-| 保单查询 | 按保单号/投保人/身份证号等多维度查询保单信息    |
-| 体检预约 | 多轮对话收集信息，自动预约体检，支持 8 家三甲医院 |
+| 智能对话 | 基于意图识别 + ReAct Agent 的 AI 对话，支持工具调用、多轮推理 |
+| 保单查询 | 按用户ID/保单号/投保人/身份证号等多维度查询保单信息    |
+| 体检预约 | 多轮对话收集信息，自动预约体检，支持自然语言日期解析（明天/下周一等） |
+| 预约记录查询 | 查询用户体检预约记录，展示医院详情（等级/地址/电话）及套餐说明 |
 | 健康咨询 | 通用健康问答与生活方式建议              |
 | 语音输入 | 浏览器原生 Web Speech API 语音识别  |
 | 数据脱敏 | 保单号/身份证/手机号等敏感信息自动脱敏展示     |
@@ -546,6 +547,7 @@ public SmartChatResponse chat(SmartChatRequest request)
 | --------------------- | --------------------- | -------- |
 | QUERY\_POLICY         | query\_policy         | 保单、保险、理赔 |
 | BOOK\_EXAMINATION     | book\_examination     | 体检、预约、检查 |
+| QUERY\_BOOKING        | query\_booking        | 预约记录、我的预约、预约情况、预约列表 |
 | HEALTH\_CONSULTATION  | health\_consultation  | 健康、症状、疾病 |
 | GENERAL\_CONVERSATION | general\_conversation | 闲聊、问候    |
 
@@ -660,9 +662,97 @@ public SmartChatResponse chat(SmartChatRequest request)
 | 邮箱   | 保留首字符+@后 | z\*\*\*\*@example.com |
 | 姓名   | 保留首字     | 张\* / 张\*\*           |
 
-### 5.3 LLM 客户端设计
+### 5.3 ReAct Agent 框架（v3.0 新增）
 
-#### 5.3.1 模板方法模式
+v3.0 引入 ReAct（Reasoning + Acting）Agent 框架，将智能对话从"单轮意图识别 → 业务服务调用"升级为"多轮思考 → 工具调用 → 观察结果 → 继续推理 → 最终回复"的循环模式。
+
+#### 5.3.1 架构概览
+
+```mermaid
+graph LR
+    subgraph "ReAct Agent"
+        Orchestrator[ReActAgentOrchestrator] --> Loop[ReActLoop]
+        Loop --> Registry[ToolRegistry]
+        Loop --> Executor[ToolExecutor]
+        Registry --> Tools[工具集合]
+        Executor --> Tools
+    end
+    
+    subgraph "意图识别"
+        IR[IntentRecognitionService] --> |"query_policy"| Orchestrator
+        IR --> |"book_examination"| Orchestrator
+        IR --> |"query_booking"| Orchestrator
+        IR --> |"health_consultation"| Simple[简单对话模式]
+    end
+    
+    subgraph "工具实现"
+        Tools --> PQ[PolicyQueryTool]
+        Tools --> BE[BookExaminationTool]
+        Tools --> QB[QueryBookingTool]
+        Tools --> LP[ListPackagesTool]
+        Tools --> LH[ListHospitalsTool]
+    end
+```
+
+#### 5.3.2 核心组件
+
+| 组件                      | 职责                       | 文件路径                                  |
+| ----------------------- | ------------------------ | ------------------------------------- |
+| ReActAgentOrchestrator  | 智能对话编排器，根据意图类型选择 ReAct 或简单模式 | `agent/ReActAgentOrchestrator.java`     |
+| ReActLoop               | Thought-Action-Observation 循环引擎 | `agent/ReActLoop.java`                |
+| ToolRegistry            | 工具注册中心，管理所有可用工具           | `agent/tool/ToolRegistry.java`        |
+| ToolExecutor            | 工具执行器，将 JSON 参数分发到对应工具    | `agent/tool/ToolExecutor.java`        |
+| ConversationState       | 会话状态（对话历史 + 当前意图 + 任务步骤）  | `agent/ConversationState.java`        |
+| SessionManager          | 会话持久化 + 意图缓存             | `service/SessionManager.java`         |
+
+#### 5.3.3 ReActLoop 工作流程
+
+```
+Thought → Action → Observation → Thought → Action → Observation → ... → Finish
+```
+
+1. **Thought（思考）**：分析用户问题 + 上下文，决定下一步操作
+2. **Action（行动）**：选择合适的工具并调用
+3. **Observation（观察）**：读取工具返回的结果
+4. 循环执行直到获得足够信息，输出 **Finish**（最终回复）
+
+最大循环步数：**10 步**，超时自动终止并返回兜底回复。
+
+#### 5.3.4 工具列表
+
+| 工具名称               | 描述                    | 必填参数            | 可选参数                    |
+| ------------------ | --------------------- | --------------- | ----------------------- |
+| `query_policy`     | 查询用户保单信息              | userId          | policyNo, status        |
+| `book_examination` | 创建体检预约                | userId, date, name, phone | hospitalName/hospitalId, packageName/packageId |
+| `query_booking`    | 查询用户体检预约记录            | userId          | status                  |
+| `list_hospitals`   | 查询可用医院列表              | 无               | 无                       |
+| `list_packages`    | 查询体检套餐列表              | 无               | 无                       |
+
+#### 5.3.5 智能特性
+
+**userId 自动注入**：当 LLM 未提供 `userId` 参数时，系统自动从当前用户上下文注入，确保工具始终使用正确的用户 ID。
+
+**自然语言日期解析**：`BookExaminationTool` 内置日期解析器，支持以下表达：
+
+| 表达       | 解析结果                    |
+| -------- | ----------------------- |
+| 今天/明天/后天 | ±N 天                   |
+| 这周末/本周末  | 本周六                    |
+| 上周末      | 上周日                    |
+| 下周一~日    | 对应下周星期                  |
+| 月底/月末    | 本月最后一天                  |
+| 下月初      | 下月 1 号                 |
+| `2026-05-17（明天）` | 正则提取 `yyyy-MM-dd` |
+
+**医院/套餐名称模糊匹配**：支持别名解析（如"协和"→"北京协和医院"、"标准"→"基础体检套餐"），未匹配时返回可用选项列表引导用户选择。
+
+**防占位符验证**：拦截 AI 生成的默认值（如 `name=用户`），强制要求真实信息。
+
+**预约记录详情展示**：查询预约记录时展示医院等级、地址、联系电话、套餐说明等完整信息。
+
+### 5.4 LLM 客户端设计
+
+#### 5.4.1 模板方法模式
 
 ```mermaid
 classDiagram
@@ -839,6 +929,7 @@ graph LR
 可选意图类型:
 - query_policy: 用户想查询保单信息（包含"保单"、"保险"、"理赔"等关键词）
 - book_examination: 用户想预约体检（包含"体检"、"预约"、"检查"等关键词）
+- query_booking: 用户想查询体检预约记录（包含"预约记录"、"我的预约"、"预约情况"、"预约列表"等关键词）
 - health_consultation: 用户想进行健康咨询（包含"健康"、"症状"、"疾病"、"怎么办"等关键词）
 - general_conversation: 一般对话、闲聊、问候等
 
@@ -893,6 +984,7 @@ stateDiagram-v2
     Idle --> IntentRecognized: 发送首条消息
     IntentRecognized --> PolicyQuery: intent=query_policy
     IntentRecognized --> ExamBooking: intent=book_examination
+    IntentRecognized --> QueryBooking: intent=query_booking
     IntentRecognized --> HealthConsult: intent=health_consultation
     IntentRecognized --> GeneralChat: intent=general_conversation
     
@@ -901,6 +993,7 @@ stateDiagram-v2
     CollectingInfo --> CollectingInfo: 追问缺失字段
     CollectingInfo --> BookingConfirmed: 信息完整
     BookingConfirmed --> Idle: 预约成功
+    QueryBooking --> Idle: 返回预约记录列表
     HealthConsult --> Idle: 返回咨询回复
     GeneralChat --> Idle: 返回通用回复
 ```
@@ -1185,5 +1278,18 @@ PolicyPage 提供表单化查询界面，支持按保单号、投保人、身份
 
 ***
 
-> **文档结束** | HealthAgent v2.0 | 2026-05-12
+> **文档结束** | HealthAgent v3.0 | 2026-05-16
+
+## v3.0 更新日志（2026-05-16）
+
+| 更新项 | 说明 |
+| ------ | ---- |
+| ReAct Agent 框架 | 引入 Thought-Action-Observation 循环推理引擎，支持工具调用 |
+| 意图识别增强 | 新增 `query_booking` 意图（查询预约记录） |
+| 保单表增加 user_id | `pol_info` 表新增 user_id 列，支持按用户ID查询保单 |
+| 体检预约智能解析 | 支持自然语言日期（明天/下周一/月底等）、医院/套餐名称模糊匹配 |
+| userId 自动注入 | ReAct 工具调用时自动注入当前用户 ID，避免 LLM 遗漏 |
+| 预约记录详情展示 | 展示医院等级/地址/电话、套餐说明等完整信息 |
+| 防占位符验证 | 拦截 AI 生成的默认值（如 name=用户），强制要求真实信息 |
+| 工具集合 | `query_policy` / `book_examination` / `query_booking` / `list_hospitals` / `list_packages` |
 

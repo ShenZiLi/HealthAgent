@@ -13,7 +13,11 @@ public class ExaminationBookingDTO {
     private Long hospitalId;
     private Long packageId;
     private String hospitalName;
+    private String hospitalLevel;
+    private String hospitalAddress;
+    private String hospitalPhone;
     private String packageName;
+    private String packageDesc;
     private LocalDate scheduleDate;
     private BigDecimal price;
     private String userId;
