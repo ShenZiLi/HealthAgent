@@ -16,6 +16,9 @@ public class PolInfoEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    @TableField("user_id")
+    private String userId;
+
     @TableField("pol_no")
     private String polNo;
 

@@ -9,6 +9,11 @@ import lombok.Data;
 public class PolicyQueryRequest {
     
     /**
+     * 用户ID
+     */
+    private String userId;
+    
+    /**
      * 保单号
      */
     private String polNo;

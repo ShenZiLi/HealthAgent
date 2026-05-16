@@ -67,6 +67,20 @@ public class PolicyService {
     }
 
     /**
+     * 根据用户ID查询
+     *
+     * @param userId 用户ID
+     * @return 保单列表
+     */
+    public List<PolInfoEntity> getByUserId(String userId) {
+        log.info("根据用户ID查询保单: {}", userId);
+        LambdaQueryWrapper<PolInfoEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PolInfoEntity::getUserId, userId)
+               .orderByDesc(PolInfoEntity::getCreateTime);
+        return polInfoMapper.selectList(wrapper);
+    }
+
+    /**
      * 条件查询保单
      *
      * @param request 查询条件
@@ -146,6 +160,9 @@ public class PolicyService {
     private LambdaQueryWrapper<PolInfoEntity> buildQueryWrapper(PolicyQueryRequest request) {
         LambdaQueryWrapper<PolInfoEntity> wrapper = new LambdaQueryWrapper<>();
         
+        if (request.getUserId() != null && !request.getUserId().isEmpty()) {
+            wrapper.eq(PolInfoEntity::getUserId, request.getUserId());
+        }
         if (request.getPolNo() != null && !request.getPolNo().isEmpty()) {
             wrapper.eq(PolInfoEntity::getPolNo, request.getPolNo());
         }

@@ -1,11 +1,12 @@
 package com.healthagent.agent.tool.impl;
 
 import com.healthagent.agent.tool.*;
-import com.healthagent.dto.PolicyInfo;
+import com.healthagent.entity.PolInfoEntity;
 import com.healthagent.service.PolicyService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 @Slf4j
@@ -66,16 +67,18 @@ public class PolicyQueryTool implements Tool {
             log.info("Executing PolicyQueryTool: userId={}, policyNo={}, status={}",
                     userId, policyNo, status);
 
-            List<PolicyInfo> policies;
+            List<PolInfoEntity> policies;
 
             if (policyNo != null && !policyNo.isBlank()) {
-                Optional<PolicyInfo> policy = policyService.getPolicyById(userId, policyNo);
+                Optional<PolInfoEntity> policy = policyService.getByPolNo(policyNo);
                 policies = policy.map(Collections::singletonList).orElse(Collections.emptyList());
             } else {
-                if ("all".equalsIgnoreCase(status)) {
-                    policies = policyService.getAllUserPolicies(userId);
-                } else {
-                    policies = policyService.getUserPolicies(userId);
+                policies = policyService.getByUserId(userId);
+                if (!"all".equalsIgnoreCase(status)) {
+                    String finalStatus = status;
+                    policies = policies.stream()
+                            .filter(p -> finalStatus.equalsIgnoreCase(p.getStatus()))
+                            .toList();
                 }
             }
 
@@ -86,11 +89,11 @@ public class PolicyQueryTool implements Tool {
             StringBuilder sb = new StringBuilder();
             sb.append("找到 ").append(policies.size()).append(" 份保单：\n\n");
             for (int i = 0; i < policies.size(); i++) {
-                PolicyInfo p = policies.get(i);
-                sb.append(i + 1).append(". ").append(p.getPolicyName()).append("\n");
-                sb.append("   保单号: ").append(p.getPolicyId()).append("\n");
+                PolInfoEntity p = policies.get(i);
+                sb.append(i + 1).append(". ").append(p.getProductName()).append("\n");
+                sb.append("   保单号: ").append(p.getPolNo()).append("\n");
                 sb.append("   保险公司: ").append(p.getInsuranceCompany()).append("\n");
-                sb.append("   保额: ").append(p.getCoverage()).append("\n");
+                sb.append("   保额: ").append(formatAmount(p.getInsuredAmount())).append("\n");
                 sb.append("   状态: ").append(p.getStatus()).append("\n\n");
             }
 
@@ -99,5 +102,12 @@ public class PolicyQueryTool implements Tool {
             log.error("PolicyQueryTool execution failed", e);
             return ToolResult.error("查询保单失败：" + e.getMessage());
         }
+    }
+
+    private String formatAmount(BigDecimal amount) {
+        if (amount == null) {
+            return "未知";
+        }
+        return "¥" + amount.toPlainString();
     }
 }

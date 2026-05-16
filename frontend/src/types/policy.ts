@@ -1,5 +1,6 @@
 export interface PolInfoEntity {
   id: number;
+  userId?: string;
   polNo: string;
   policyHolderName: string;
   insuredName: string;
@@ -17,6 +18,7 @@ export interface PolInfoEntity {
 }
 
 export interface PolicyQueryRequest {
+  userId?: string;
   polNo?: string;
   policyHolderName?: string;
   idCardNo?: string;
