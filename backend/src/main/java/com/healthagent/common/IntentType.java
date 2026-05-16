@@ -16,6 +16,11 @@ public enum IntentType {
     BOOK_EXAMINATION("book_examination", "体检预约"),
 
     /**
+     * 查询预约记录
+     */
+    QUERY_BOOKING("query_booking", "查询预约记录"),
+
+    /**
      * 健康咨询
      */
     HEALTH_CONSULTATION("health_consultation", "健康咨询"),

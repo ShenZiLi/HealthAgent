@@ -77,7 +77,8 @@ public class ReActAgentOrchestrator {
     }
 
     private boolean shouldUseReAct(IntentType intent) {
-        return intent == IntentType.QUERY_POLICY || intent == IntentType.BOOK_EXAMINATION;
+        return intent == IntentType.QUERY_POLICY || intent == IntentType.BOOK_EXAMINATION
+                || intent == IntentType.QUERY_BOOKING;
     }
 
     private SmartChatResponse executeReAct(ConversationState state, SmartChatRequest request) {
