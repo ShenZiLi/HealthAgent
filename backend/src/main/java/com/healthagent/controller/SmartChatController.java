@@ -1,5 +1,6 @@
 package com.healthagent.controller;
 
+import com.healthagent.agent.ReActAgentOrchestrator;
 import com.healthagent.common.Result;
 import com.healthagent.dto.SmartChatRequest;
 import com.healthagent.dto.SmartChatResponse;
@@ -20,13 +21,16 @@ public class SmartChatController {
     @Autowired
     private SmartChatService smartChatService;
 
+    @Autowired
+    private ReActAgentOrchestrator reActAgentOrchestrator;
+
     @Operation(summary = "发送智能对话消息")
     @PostMapping("/send")
     public Result<SmartChatResponse> sendSmartMessage(@Valid @RequestBody SmartChatRequest request) {
         try {
             log.info("收到智能对话请求: message={}, userId={}", request.getMessage(), request.getUserId());
             
-            SmartChatResponse response = smartChatService.chat(request);
+            SmartChatResponse response = reActAgentOrchestrator.execute(request);
             
             log.info("智能对话响应: intent={}, action={}", response.getIntent(), response.getAction());
             
