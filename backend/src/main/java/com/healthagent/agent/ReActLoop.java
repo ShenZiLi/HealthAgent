@@ -50,6 +50,7 @@ public class ReActLoop {
         - Action Input 必须是 valid JSON
         - 工具调用只调用一次，不要嵌套或循环调用
         - 调用工具时，必须包含 userId 参数（即当前用户的ID）
+        - 当用户提到相对日期时（如明天、后天、下周一、本周末、月底等），请根据当前日期自行计算出具体的 YYYY-MM-DD 格式日期，并在 date 参数中传入具体日期
         """;
 
     private static final Pattern THOUGHT_PATTERN = Pattern.compile("Thought:\\s*(.*?)(?=\\s*(Action|Finish|$))", Pattern.DOTALL);
@@ -118,6 +119,10 @@ public class ReActLoop {
 
     private String buildPrompt(ConversationState state, UserInput input, List<ReActStep> previousSteps) {
         StringBuilder sb = new StringBuilder();
+
+        String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        String dayOfWeek = java.time.LocalDate.now().getDayOfWeek().toString();
+        sb.append("当前日期: ").append(today).append(" (").append(dayOfWeek).append(")\n\n");
 
         for (ChatMessage msg : state.getHistory()) {
             sb.append(msg.getRole()).append(": ").append(msg.getContent()).append("\n");

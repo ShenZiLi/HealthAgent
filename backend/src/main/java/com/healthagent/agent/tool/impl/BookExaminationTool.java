@@ -9,7 +9,11 @@ import com.healthagent.service.ExaminationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 
 @Slf4j
@@ -124,7 +128,7 @@ public class BookExaminationTool implements Tool {
             request.setUserId(userId);
             request.setHospitalId(hospitalId);
             request.setPackageId(packageId);
-            request.setScheduleDate(LocalDate.parse(dateStr));
+            request.setScheduleDate(resolveDate(dateStr));
             request.setBookerName(bookerName);
             request.setBookerPhone(bookerPhone);
 
@@ -189,5 +193,126 @@ public class BookExaminationTool implements Tool {
         }
 
         return null;
+    }
+
+    private LocalDate resolveDate(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) {
+            throw new IllegalArgumentException("预约日期不能为空");
+        }
+
+        dateStr = dateStr.trim();
+
+        if (dateStr.matches(".*\\d{4}-\\d{2}-\\d{2}.*")) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d{4}-\\d{2}-\\d{2})").matcher(dateStr);
+            if (m.find()) {
+                return LocalDate.parse(m.group(1), DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            }
+        }
+
+        LocalDate today = LocalDate.now();
+        String lower = dateStr.toLowerCase();
+
+        switch (lower) {
+            case "今天":
+                return today;
+            case "明天":
+                return today.plusDays(1);
+            case "后天":
+                return today.plusDays(2);
+            case "大后天":
+                return today.plusDays(3);
+            case "昨天":
+                return today.minusDays(1);
+            case "前天":
+                return today.minusDays(2);
+        }
+
+        if (lower.contains("下周末")) {
+            return today.with(TemporalAdjusters.next(DayOfWeek.SATURDAY)).plusWeeks(1);
+        }
+        if (lower.contains("上周末")) {
+            return today.with(TemporalAdjusters.previous(DayOfWeek.SUNDAY));
+        }
+        if (lower.contains("周末") || lower.contains("这周末") || lower.contains("本周末")) {
+            return today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY));
+        }
+
+        if (lower.contains("下周一")) {
+            return today.with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+        }
+        if (lower.contains("下周二")) {
+            return today.with(TemporalAdjusters.next(DayOfWeek.TUESDAY));
+        }
+        if (lower.contains("下周三")) {
+            return today.with(TemporalAdjusters.next(DayOfWeek.WEDNESDAY));
+        }
+        if (lower.contains("下周四")) {
+            return today.with(TemporalAdjusters.next(DayOfWeek.THURSDAY));
+        }
+        if (lower.contains("下周五")) {
+            return today.with(TemporalAdjusters.next(DayOfWeek.FRIDAY));
+        }
+        if (lower.contains("下周六")) {
+            return today.with(TemporalAdjusters.next(DayOfWeek.SATURDAY));
+        }
+        if (lower.contains("下周日")) {
+            return today.with(TemporalAdjusters.next(DayOfWeek.SUNDAY));
+        }
+        if (lower.contains("下周")) {
+            return today.plusWeeks(1).with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
+        }
+
+        if (lower.contains("本周一") || lower.contains("这周一")) {
+            return today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        }
+        if (lower.contains("本周二") || lower.contains("这周二")) {
+            return today.with(TemporalAdjusters.nextOrSame(DayOfWeek.TUESDAY));
+        }
+        if (lower.contains("本周三") || lower.contains("这周三")) {
+            return today.with(TemporalAdjusters.nextOrSame(DayOfWeek.WEDNESDAY));
+        }
+        if (lower.contains("本周四") || lower.contains("这周四")) {
+            return today.with(TemporalAdjusters.nextOrSame(DayOfWeek.THURSDAY));
+        }
+        if (lower.contains("本周五") || lower.contains("这周五")) {
+            return today.with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
+        }
+        if (lower.contains("本周六") || lower.contains("这周六")) {
+            return today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY));
+        }
+        if (lower.contains("本周日") || lower.contains("这周日")) {
+            return today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        }
+        if (lower.contains("这周") || lower.contains("本周")) {
+            return today.with(TemporalAdjusters.nextOrSame(DayOfWeek.MONDAY));
+        }
+
+        if (lower.contains("下个月底") || lower.contains("下月末")) {
+            return today.plusMonths(1).with(TemporalAdjusters.lastDayOfMonth());
+        }
+        if (lower.contains("月底") || lower.contains("月末")) {
+            return today.with(TemporalAdjusters.lastDayOfMonth());
+        }
+
+        if (lower.contains("下月初") || lower.contains("下月头")) {
+            return today.plusMonths(1).withDayOfMonth(1);
+        }
+        if (lower.contains("月初") || lower.contains("月头")) {
+            return today.withDayOfMonth(1);
+        }
+
+        if (lower.contains("下个月") || lower.contains("次月")) {
+            return today.plusMonths(1);
+        }
+        if (lower.contains("这月") || lower.contains("本月")) {
+            return today;
+        }
+
+        try {
+            return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        } catch (DateTimeParseException e) {
+            log.warn("无法解析日期字符串: {}, 默认为明天", dateStr);
+            return today.plusDays(1);
+        }
     }
 }
